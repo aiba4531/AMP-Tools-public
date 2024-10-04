@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build_and_run_hw4",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "build_and_run.sh",
+                "hw4"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+ }
+ 

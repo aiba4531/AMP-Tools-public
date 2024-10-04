@@ -18,13 +18,12 @@ amp::Path2D MyBugAlgorithm::plan(const amp::Problem2D& problem) {
 
     Eigen::Vector2d current_point, rel_next_point, next_point;
 
-    // Get the m-line, original goal vector and distance
-    std::tuple<Eigen::Vector2d, Eigen::Vector2d> mLine = std::make_tuple(path.waypoints.back(), problem.q_goal - path.waypoints.back());
+    // Get the original goal vector and distance
     Eigen::Vector2d goalVector = (problem.q_goal - path.waypoints.back()).normalized();
     double orig_distance = (problem.q_goal - path.waypoints.back()).norm();
 
     int max_itr, max_itr2, max_itr3 = 0;
-    while (max_itr < 1000) {
+    while (max_itr < 10000) {
     
     // Jump Statement if goal can be reached after any iteration
     Move_to_goal:
@@ -86,7 +85,6 @@ amp::Path2D MyBugAlgorithm::plan(const amp::Problem2D& problem) {
             
             // Define a variable to use a flag to jump to goal
             bool goToGoal = false;
-            bool move_to_mline = false;
             
             // Define the number of vertices in the obstacle
             int numVertices = all_primitives[i].size() + 1; //+1 to loop back to the hit point
@@ -98,11 +96,11 @@ amp::Path2D MyBugAlgorithm::plan(const amp::Problem2D& problem) {
 
             // After a collision, follow the wall unless you can move straight to goal
             do {
-                //Can we go to goal from current point without any intersections?
-                goToGoal = jump_to_goal(current_point, problem.q_goal, all_primitives, path);
-                if(goToGoal){
-                    goto Move_to_goal; // label to jump to top of while loop
-                }
+                // Can we go to goal from current point without any intersections?
+                // goToGoal = jump_to_goal(current_point, problem.q_goal, all_primitives, path);
+                // if(goToGoal){
+                //     goto Move_to_goal; // label to jump to top of while loop
+                // }
 
                 // Otherwise move towards the CCW vertex from hit point
                 k = (j + 1) % all_primitives[i].size(); // get the next vertex index
@@ -117,20 +115,15 @@ amp::Path2D MyBugAlgorithm::plan(const amp::Problem2D& problem) {
                 // Get the original distance from the current point to the previous vertex along the edge we are going to follow
                 orig_distance_between_current_and_prev_vertex_along_the_edge = (current_point_prev_vertex_vector.dot(edge_direction)/(edge_direction.dot(edge_direction))*edge_direction).dot(edge_direction);
                 distance_traveled = 0; // we will follow until: distance_traveled + orig_distance_between_current_and_prev_vertex_along_the_edge < orig_distance_between_verticies
-                
-                // move_to_mline = found_mLine(mLine, std::make_tuple(current_point, rel_next_point), current_distance_goal, distance_hit_point_to_goal);
-                // if (move_to_mline) {
-                //     std::cout << "I found the m-line" << std::endl;    
-                // }
 
                 // Follow the edge until the next vertex is reached
                 do
                 {
                     // Can we go to goal from current point without any intersections?
-                    goToGoal = jump_to_goal(current_point, problem.q_goal, all_primitives, path);
-                    if(goToGoal){
-                        goto Move_to_goal;
-                    }
+                    // goToGoal = jump_to_goal(current_point, problem.q_goal, all_primitives, path);
+                    // if(goToGoal){
+                    //     goto Move_to_goal;
+                    // }
 
                     // Otherwise move along the edge direciton of the current edge
                     edge_direction = std::get<1>(all_primitives[i][j]).normalized(); // direction of the edge
@@ -146,8 +139,8 @@ amp::Path2D MyBugAlgorithm::plan(const amp::Problem2D& problem) {
                     if (safe_next_point == false) { // if movement along the edge intersects with a primitive
        
                         // New hit point! Reset the hit point and distance to goal
-                        hit_point = current_point;
-                        distance_hit_point_to_goal = (problem.q_goal - hit_point).norm();
+                        //hit_point = current_point;
+                        //distance_hit_point_to_goal = (problem.q_goal - hit_point).norm();
                         current_distance_goal = distance_hit_point_to_goal;
                         
                         // Get the intersecting primitive
@@ -187,7 +180,7 @@ amp::Path2D MyBugAlgorithm::plan(const amp::Problem2D& problem) {
                     // Add the new point as a potential new leave point 
                     leave_points.push_back(std::make_tuple(current_point, current_distance_goal));
                 } 
-                while (orig_distance_between_current_and_prev_vertex_along_the_edge + distance_traveled < orig_distance_between_verticies && max_itr3 < 1000);
+                while (orig_distance_between_current_and_prev_vertex_along_the_edge + distance_traveled < orig_distance_between_verticies && max_itr3 < 10000);
                 max_itr3 = 0;
 
                 // Now I have traveled at least far enough to be outside the next vertex I was traveling towards
@@ -195,7 +188,7 @@ amp::Path2D MyBugAlgorithm::plan(const amp::Problem2D& problem) {
                 visitedVertices++; // I have visited a vertex
                 max_itr2++; // increment to avoid inf loops
             } 
-            while(visitedVertices < numVertices && max_itr2 < 1000); // if I have visited every vertex, or if I have been in the loop for too long, break out of the loop
+            while(visitedVertices < numVertices && max_itr2 < 50); // if I have visited every vertex, or if I have been in the loop for too long, break out of the loop
             max_itr2 = 0; // reset the max itr variable
 
             // Determine the closest leave point I found to resume towards the goal
@@ -272,7 +265,6 @@ std::vector<std::tuple<bool, std::tuple<int, int>>> MyBugAlgorithm::next_step_co
             if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
                 intersecting_primitive = std::make_tuple(i, j);
                 all_intersecting_primitives.push_back(std::make_tuple(false, intersecting_primitive));
-
             }
         }
     }
@@ -316,31 +308,5 @@ std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> MyBugAlgo
         path.waypoints.push_back(current_point + ideal_next_point);
         return true;
     }
-    return false;
-}
-
-bool MyBugAlgorithm::found_mLine(std::tuple<Eigen::Vector2d, Eigen::Vector2d> mLine, const std::tuple<Eigen::Vector2d, Eigen::Vector2d> next_step, double prev_distance_goal, double& distance_goal) {
-    // Get the m-line, original goal vector and distance
-     // Get the two vectors
-    Eigen::Vector2d vector1 = std::get<1>(mLine);
-    Eigen::Vector2d vector2 = std::get<1>(next_step);
-    // Get the two points
-    Eigen::Vector2d point1 = std::get<0>(mLine);
-    Eigen::Vector2d point2 = std::get<0>(next_step);
-    // Get the intersection point
-    Eigen::Vector2d intersection = point1 - point2;
-    // Get the determinant
-    double det = vector1[0]*vector2[1] - vector1[1]*vector2[0];
-    // Get the intersection point
-    double t = (vector2[0]*intersection[1] - vector2[1]*intersection[0]) / det;
-    double u = (vector1[0]*intersection[1] - vector1[1]*intersection[0]) / det;
-    // If the intersection point is between 0 and 1, then the vectors intersect
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-
-        if (distance_goal < prev_distance_goal) {
-            return true;
-        }
-    }
-
     return false;
 }
