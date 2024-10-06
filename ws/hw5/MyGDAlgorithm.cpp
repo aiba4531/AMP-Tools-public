@@ -12,7 +12,7 @@ amp::Path2D MyGDAlgorithm::plan(const amp::Problem2D& problem) {
     double potential = potentialFunc(path.waypoints[0]);
     
     // Compute graidient and add some randomness to first step
-    Eigen::Vector2d grad = potentialFunc.gradient(path.waypoints[0]);
+    Eigen::Vector2d grad = potentialFunc.getGradient(path.waypoints[0]);
 
     // Run Gradient Descent    
     double itr = 0;
@@ -26,7 +26,7 @@ amp::Path2D MyGDAlgorithm::plan(const amp::Problem2D& problem) {
         old_point = path.waypoints.back();
         new_point = path.waypoints.back() - grad * alpha;
         path.waypoints.push_back(new_point);
-        grad = potentialFunc.gradient(path.waypoints.back());
+        grad = potentialFunc.getGradient(path.waypoints.back());
 
     
         // If the potential has incrased, then we have reached a local minimum
@@ -41,7 +41,7 @@ amp::Path2D MyGDAlgorithm::plan(const amp::Problem2D& problem) {
             new_point = take_random_step(problem, new_point);
             path.waypoints.pop_back();
             path.waypoints.push_back(new_point);
-            grad = potentialFunc.gradient(path.waypoints.back());
+            grad = potentialFunc.getGradient(path.waypoints.back());
             local_min_counter = 0;
             //std::cout << "Random Step" << new_point.transpose() << std::endl;
         }   
@@ -67,9 +67,11 @@ Eigen::Vector2d MyGDAlgorithm::take_random_step(const amp::Problem2D& env, const
 
         if (random3 <= 0.0) {
             random1 = -random1;
+            random2 = 0.0;
         }
         else {
             random2 = -random2;
+            random1 = 0.0;
         }
 
         random_step = Eigen::Vector2d(random1, random2);

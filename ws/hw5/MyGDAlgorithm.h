@@ -82,7 +82,8 @@ class MyPotentialFunction : public amp::PotentialFunction2D {
 			return potential;
 		}
 
-		virtual Eigen::Vector2d gradient(const Eigen::Vector2d& q)  {
+
+		virtual Eigen::Vector2d getGradient(const Eigen::Vector2d& q) const override {
 
 			// Initialize attractive gradient
 			Eigen::Vector2d att_grad;
@@ -125,6 +126,7 @@ class MyPotentialFunction : public amp::PotentialFunction2D {
 
 			return att_grad + rep_grad;
 		}
+		
 		
 	private:
 		const amp::Problem2D& problem;
