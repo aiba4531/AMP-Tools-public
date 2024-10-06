@@ -111,6 +111,7 @@ std::unique_ptr<amp::GridCSpace2D> MyManipulatorCSConstructor::construct(const a
         }
         all_primitives.push_back(primitives);
     }
+    
 
     // A link maniupaltor has two links length 1.0 each. The bounds of the cspace are the angles between links 0 and 1, and links 1 and the end effector.
     // Therefore we will loop through the joint angles use inverse kinematics to get the end effector position
