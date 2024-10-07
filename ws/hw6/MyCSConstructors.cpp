@@ -1,6 +1,10 @@
 #include "MyCSConstructors.h"
 #include <queue>
 
+////////////////////// THIS IS FROM HW4 //////////////////////
+
+/* You can just move these classes to shared folder and include them instead of copying them to hw6 project*/
+
 std::pair<std::size_t, std::size_t> MyGridCSpace2D::getCellFromPoint(double x0, double x1) const {
     // Implment your discretization procedure here, such that the point (x0, x1) lies within the returned cell
     double x0_min, x0_max, x1_min, x1_max, x0_step, x1_step, x0_diff, x1_diff;
@@ -117,6 +121,7 @@ std::unique_ptr<amp::GridCSpace2D> MyManipulatorCSConstructor::construct(const a
     return cspace_ptr;
 }
 
+<<<<<<< HEAD
 
 std::vector<std::tuple<bool, std::tuple<int, int>>> MyGridCSpace2D::next_step_collision(const std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives, const std::tuple<Eigen::Vector2d, Eigen::Vector2d> next_step){
      // Check for collisions with all obstacle primitives
@@ -164,6 +169,9 @@ std::vector<std::tuple<bool, std::tuple<int, int>>> MyGridCSpace2D::next_step_co
     return all_intersecting_primitives;
 }
 
+=======
+//////////////////////////////////////////////////////////////
+>>>>>>> upstream/main
 
 // Override this method for computing all of the boolean collision values for each cell in the cspace
 std::unique_ptr<amp::GridCSpace2D> MyPointAgentCSConstructor::construct(const amp::Environment2D& env) {
