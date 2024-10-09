@@ -6,6 +6,8 @@
 MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProblem& problem, const amp::SearchHeuristic& heuristic) {
     std::cout << "Starting A* Graph Search: Init --> goal | " << problem.init_node << " --> " << problem.goal_node << std::endl;
     GraphSearchResult result = {false, {}, 0.0}; // Initialize the results object
+    
+    // Initialize the start and goal nodes
     int start_node = problem.init_node;
     int goal_node = problem.goal_node;
 
@@ -17,18 +19,19 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
     
     // Priority queue (min-heap) to store nodes with their f_cost
     std::priority_queue<std::pair<double, int>, std::vector<std::pair<double, int>>, std::greater<std::pair<double, int>>> open_set;
+    std::vector<bool> closed_set(num_nodes, false);
 
     // Vectors to store g_cost (distance from start), f_cost (g_cost + heuristic), and visited nodes
     std::vector<double> g_cost(num_nodes, std::numeric_limits<double>::infinity());
     std::vector<double> f_cost(num_nodes, std::numeric_limits<double>::infinity());
-    std::vector<bool> closed_set(num_nodes, false);
     
     // Map to track parent nodes for path reconstruction
     std::unordered_map<int, int> parent_map;
 
     // Initialize start node costs
     g_cost[start_node] = 0.0;
-    f_cost[start_node] = heuristic.operator()(start_node);
+    f_cost[start_node] = heuristic(start_node);
+    //f_cost[start_node] = heuristic.operator()(start_node);
     open_set.push({f_cost[start_node], start_node});
     
     while (!open_set.empty()) {
@@ -38,6 +41,7 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
 
         // If goal node is reached, reconstruct the path
         if (current_node == goal_node) {
+            result.success = true;
             result.path_cost = g_cost[goal_node];
         
             // Reconstruct the path from goal to start using the parent map
@@ -56,11 +60,16 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
         // Mark the node as visited
         closed_set[current_node] = true;
 
-        for (int n = 0 ; n < graph->outgoingEdges(current_node).size(); n++) {
-            double edge_cost = graph->outgoingEdges(current_node)[n];
-            std::cout << "Parent: " << current_node << " Child: " << n << " Edge Cost: " << edge_cost << std::endl;
+        // Access neighboring nodes and corresponding edge costs
+        const auto& neighbors = graph->children(current_node);  // Get neighbors of current_node
+        const auto& edges = graph->outgoingEdges(current_node);   // Get edge costs of current_node
 
-            if (closed_set[n]) {
+        // Iterate over the neighbors of the current node
+        for (int k = 0; k < neighbors.size(); k++) {
+            int neighbor_node = neighbors[k];
+            double edge_cost = edges[k];
+
+            if (closed_set[neighbor_node]) {
                 continue; // Skip already visited nodes
             }
 
@@ -68,16 +77,16 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
             double tentative_g_cost = g_cost[current_node] + edge_cost;
 
             // If a shorter path to the neighbor is found
-            if (tentative_g_cost < g_cost[n]) {
-                parent_map[n] = current_node;
-                g_cost[n] = tentative_g_cost;
-                f_cost[n] = g_cost[n] + heuristic.operator()(n);
+            if (tentative_g_cost < g_cost[neighbor_node]) {
+                parent_map[neighbor_node] = current_node;
+                g_cost[neighbor_node] = tentative_g_cost;
+                f_cost[neighbor_node] = g_cost[neighbor_node] + heuristic(neighbor_node);
 
-                open_set.push({f_cost[n], n});
+                open_set.push({f_cost[neighbor_node], neighbor_node});
             }
         }
-    }
-
+    }    
+    
     // If the open set is empty and the goal is not reached, return failure
     std::cout << "Failed to find a path." << std::endl;
     result.print();
