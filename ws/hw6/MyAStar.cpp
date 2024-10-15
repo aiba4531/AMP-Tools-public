@@ -31,8 +31,9 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
     // Initialize start node costs
     g_cost[start_node] = 0.0;
     f_cost[start_node] = heuristic(start_node);
-    //f_cost[start_node] = heuristic.operator()(start_node);
     open_set.push({f_cost[start_node], start_node});
+
+    int numItr = 0;
     
     while (!open_set.empty()) {
         // Get the node with the smallest f_cost
@@ -54,6 +55,7 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
             std::reverse(result.node_path.begin(), result.node_path.end());
 
             result.print();
+            std::cout << "Number of iterations: " << numItr << std::endl;
             return result;
         }
 
@@ -85,6 +87,7 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
                 open_set.push({f_cost[neighbor_node], neighbor_node});
             }
         }
+        numItr++;
     }    
     
     // If the open set is empty and the goal is not reached, return failure

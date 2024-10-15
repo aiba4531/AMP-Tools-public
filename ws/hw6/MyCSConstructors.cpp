@@ -1,5 +1,8 @@
 #include "MyCSConstructors.h"
 #include <queue>
+#include <iomanip>
+#include <ctime>
+#include <sstream>
 
 ////////////////////// THIS IS FROM HW4 //////////////////////
 
@@ -38,8 +41,8 @@ std::pair<std::size_t, std::size_t> MyGridCSpace2D::getCellFromPoint(double x0, 
 std::unique_ptr<amp::GridCSpace2D> MyManipulatorCSConstructor::construct(const amp::LinkManipulator2D& manipulator, const amp::Environment2D& env) {
     // Create an object of my custom cspace type (e.g. MyGridCSpace2D) and store it in a unique pointer. 
     // Pass the constructor parameters to std::make_unique()
-    // std::unique_ptr<MyGridCSpace2D> cspace_ptr = std::make_unique<MyGridCSpace2D>(m_cells_per_dim, m_cells_per_dim, 0, 2*M_PI, 0, 2*M_PI);
-    std::unique_ptr<MyGridCSpace2D> cspace_ptr = std::make_unique<MyGridCSpace2D>(m_cells_per_dim, m_cells_per_dim, -M_PI, M_PI, -M_PI, M_PI);
+    std::unique_ptr<MyGridCSpace2D> cspace_ptr = std::make_unique<MyGridCSpace2D>(m_cells_per_dim, m_cells_per_dim, 0, 2*M_PI, 0, 2*M_PI);
+    //std::unique_ptr<MyGridCSpace2D> cspace_ptr = std::make_unique<MyGridCSpace2D>(m_cells_per_dim, m_cells_per_dim, -M_PI, M_PI, -M_PI, M_PI);
     // In order to use the pointer as a regular GridCSpace2D object, we can just create a reference
     MyGridCSpace2D& cspace = *cspace_ptr;
     std::cout << "Constructing C-space for manipulator" << std::endl;
@@ -68,18 +71,18 @@ std::unique_ptr<amp::GridCSpace2D> MyManipulatorCSConstructor::construct(const a
     // Define 2D Manipulator State
     amp::ManipulatorState state = Eigen::VectorXd::Zero(manipulator.nLinks());
 
-    // Define the bounds of the cspace
-    // double x0_min = 0;
-    // double x0_max = 2 * M_PI;
-    // double x1_min = 0;
-    // double x1_max = 2 * M_PI;
-    // double step = 2 * M_PI / m_cells_per_dim;
-
-    double x0_min = -M_PI;
-    double x0_max = M_PI;
-    double x1_min = -M_PI;
-    double x1_max = M_PI;
+    // // Define the bounds of the cspace
+    double x0_min = 0;
+    double x0_max = 2 * M_PI;
+    double x1_min = 0;
+    double x1_max = 2 * M_PI;
     double step = 2 * M_PI / m_cells_per_dim;
+
+    // double x0_min = -M_PI;
+    // double x0_max = M_PI;
+    // double x1_min = -M_PI;
+    // double x1_max = M_PI;
+    // double step = 2 * M_PI / m_cells_per_dim;
 
     // Iterate over each cell in the cspace
     for (int i = 0; i < m_cells_per_dim; i++) {
@@ -208,22 +211,50 @@ std::unique_ptr<amp::GridCSpace2D> MyPointAgentCSConstructor::construct(const am
 
 
 // Wavefront Planner in Cspace
-amp::Path2D MyWaveFrontAlgorithm::planInCSpace(const Eigen::Vector2d& q_init, const Eigen::Vector2d& q_goal, const amp::GridCSpace2D& grid_cspace) {
+amp::Path2D MyWaveFrontAlgorithm::planInCSpace(const Eigen::Vector2d& q_init, const Eigen::Vector2d& q_goal, const amp::GridCSpace2D& grid_cspace, bool isManipulator) {
     // Implement your WaveFront algorithm here
     amp::Path2D path;
 
+    Eigen::Vector2d q_init_new, q_goal_new;
+    q_init_new = q_init;
+    q_goal_new = q_goal;
+    
+    if(isManipulator){
+        if (q_init[0] < 0){
+            q_init_new[0] = 2*M_PI + q_init[0];
+        }
+        if (q_init[1] < 0){
+            q_init_new[1] = 2*M_PI + q_init[1];
+        }
+        if (q_goal[0] < 0){
+            q_goal_new[0] = 2*M_PI + q_goal[0];
+        }
+        if (q_goal[1] < 0){
+            q_goal_new[1] = 2*M_PI + q_goal[1];
+        }
+    }
+
     // Push back the initial point
-    path.waypoints.push_back(q_init);
+    path.waypoints.push_back(q_init_new);
 
     // Initially set every value on the grid to zero
     std::vector<std::vector<int>> distance(grid_cspace.size().first, std::vector<int>(grid_cspace.size().second, 0));
    
     // Get the cell that the goal point is in
-    std::pair<std::size_t, std::size_t> q_goal_cell = grid_cspace.getCellFromPoint(q_goal[0], q_goal[1]);
+    std::pair<std::size_t, std::size_t> q_goal_cell = grid_cspace.getCellFromPoint(q_goal_new[0], q_goal_new[1]);
     distance[q_goal_cell.first][q_goal_cell.second] = 2;
 
+    if(grid_cspace(q_goal_cell.first, q_goal_cell.second) == 1){
+        std::cout << "Goal cell is in collision" << std::endl;
+       // To fix this find the other way to make this not in collision
+    }
+
     // Get the cell that the initial point is in
-    std::pair<std::size_t, std::size_t> q_init_cell = grid_cspace.getCellFromPoint(q_init[0], q_init[1]);
+    std::pair<std::size_t, std::size_t> q_init_cell = grid_cspace.getCellFromPoint(q_init_new[0], q_init_new[1]);
+
+        if (grid_cspace(q_init_cell.first, q_init_cell.second) == 1) {
+        std::cout << "The initial cell is in collision" << std::endl;
+    }
 
     // Set every cell that is in collision with a value of 1
     for (int i = 0; i < grid_cspace.size().first; i++) {
@@ -250,41 +281,139 @@ amp::Path2D MyWaveFrontAlgorithm::planInCSpace(const Eigen::Vector2d& q_init, co
     
     // Push the goal cell to the queue
     queue.push(q_goal_cell);
+
+    // Max iterations
+    double max_itr = grid_cspace.size().first * grid_cspace.size().second;
+    std::size_t x_bounds = grid_cspace.size().first;
+    std::size_t y_bounds = grid_cspace.size().second;
     
     
     // Iterate until the queue is empty or the max number of iterations is reached
-    while (!queue.empty() && itr < 40000000) {
+    while (itr < max_itr) {
+
+        // Pop the front of the queue
+        if (queue.empty()) {
+            std::cout << "Queue is empty" << std::endl << std::endl;
+            
+            // Display the column indices with consistent formatting
+            bool disp = false;
+            if (disp) {
+                // Generate a unique file name based on the current timestamp
+                std::time_t t = std::time(nullptr);
+                std::tm* now = std::localtime(&t);
+                std::stringstream file_name;
+                file_name << "/home/aidanbagley/AMP-Tools-public/ws/hw6/logs/grid_cspace_dump_" << (now->tm_year + 1900) << '_'
+                        << (now->tm_mon + 1) << '_' << now->tm_mday << '_'
+                        << now->tm_hour << now->tm_min << now->tm_sec << ".txt";
+
+                
+                // Open the file for writing
+                std::cout << "Dumping grid data to " << file_name.str() << std::endl;
+                std::ofstream dump_file(file_name.str());
+                
+                if (!dump_file.is_open()) {
+                    std::cerr << "Error opening file for writing." << std::endl;
+                    return path;
+                }
+
+                // Write the column indices to the file
+                dump_file << "      ";  // Initial padding for row index column
+                for (std::size_t j = 0; j < y_bounds; ++j) {
+                    dump_file << std::setw(3) << j << " ";  // Use std::setw(3) for better spacing of two-digit indices
+                }
+                dump_file << std::endl;
+
+                // Write the grid with row indices to the file
+                for (std::size_t i = 0; i < x_bounds; ++i) {
+                    dump_file << std::setw(2) << i << "    ";  // Row index with spacing
+                    for (std::size_t j = 0; j < y_bounds; ++j) {
+                        dump_file << std::setw(3) << (grid_cspace(i, j) ? "1" : "0") << " ";  // Align grid values
+                    }
+                    dump_file << std::endl;
+                }
+
+                dump_file << std::endl;
+                dump_file << "The initial point was: " << q_goal_new.transpose() << std::endl;
+                dump_file << "The goal point was: " << q_init_new.transpose() << std::endl;
+                dump_file << "The initial cell was: " << q_init_cell.first << ", " << q_init_cell.second << std::endl;
+                dump_file << "The goal cell was: " << q_goal_cell.first << ", " << q_goal_cell.second << std::endl <<std::endl;
+
+                // Close the file
+                dump_file.close();
+
+                std::cout << "Grid data dumped to grid_cspace_dump.txt" << std::endl;
+            }
+
+            
+            break;
+        }
+
+        
         // Get the cell indicies from the front of the queue
         std::pair<std::size_t, std::size_t> current_cell = queue.front();
+        queue.pop();
 
         if (current_cell == q_init_cell) {
+            std::cout << "Reached the initial cell" << std::endl;
             break;
         }
 
         std::size_t i = current_cell.first;
         std::size_t j = current_cell.second;
-        
-        // Pop the front of the queue
-        queue.pop();
+
 
         // Get the current distance value for this cell
         int current_distance = distance[i][j];
 
+        // std::cout << "Current cell: i = " << i << " j = " << j << " distance = " << current_distance << std::endl;
+
         // For each of the 4 neighbors (up, down, left, right) take current distance and add 1
         std::vector<std::pair<int, int>> neighbors = {{i-1, j}, {i+1, j}, {i, j-1}, {i, j+1}};
         for (const auto& [x, y] : neighbors) {
-            if (x >= 0 && x < grid_cspace.size().first && y >= 0 && y < grid_cspace.size().second) {
-                if (distance[x][y] != 1 && distance[x][y] == 0) {  // Not an obstacle
-                    distance[x][y] = current_distance + 1;
-                    queue.push({x, y}); 
-                }
+            if (x >= 0 && x < x_bounds && y >= 0 && y < y_bounds && distance[x][y] == 0) {  // Not an obstacle
+                distance[x][y] = current_distance + 1;
+                queue.push({x, y}); 
+            }
+        }
+        
+        // If I am a manipulator, then I may need to wrap around the grid if I havent gotten there yet
+        if (isManipulator){
+            if (i == x_bounds - 1 && j == y_bounds - 1 && distance[0][0] == 0) { // Top right
+                distance[0][0] = current_distance + 1;
+                // std::cout << "Top right" << std::endl;
+                queue.push({0, 0});
+            }
+            if (i == 0 && j == 0 && distance[x_bounds - 1][y_bounds - 1] == 0) { // Bottom left
+                distance[x_bounds - 1][y_bounds - 1] = current_distance + 1;
+                // std::cout << "Bottom left i = " << i << " j = " << j << std::endl;
+                queue.push({x_bounds - 1, y_bounds - 1});
+            }
+            if (i == x_bounds - 1 && distance[0][j] == 0) { // Top row
+                distance[0][j] = current_distance + 1;
+                // std::cout << "Top row" << std::endl;
+                queue.push({0, j});
+            }
+            if (i == 0 && distance[x_bounds - 1][j] == 0) { // Bottom row
+                distance[x_bounds - 1][j] = current_distance + 1;
+                // std::cout << "Bottom row i = " << i << " j = " << j << std::endl;
+                queue.push({x_bounds - 1, j});
+            }
+            if (j == 0 && distance[i][y_bounds - 1] == 0) { // Left column
+                distance[i][y_bounds - 1] = current_distance + 1;
+                // std::cout << "Left Column i = " << i << " j = " << j << std::endl;
+                queue.push({i, y_bounds - 1});
+            }
+            if (j == y_bounds - 1 && distance[i][0] == 0) { // Right column
+                distance[i][0] = current_distance + 1;
+                // std::cout << "Right column" << std::endl;
+                queue.push({i, 0});
             }
         }
 
         itr++;
     }
 
-    std::cout << "Finished brushfire with " << itr << " iterations";
+    std::cout << "Finished brushfire with " << itr << " iterations" << std::endl;
     
     // Starting at the initial cell
     std::pair<std::size_t, std::size_t> current_cell = q_init_cell;
@@ -306,7 +435,7 @@ amp::Path2D MyWaveFrontAlgorithm::planInCSpace(const Eigen::Vector2d& q_init, co
         int min_distance = current_distance;
 
         for (const auto& [x, y] : neighbors) {
-            if (x >= 0 && x < grid_cspace.size().first && y >= 0 && y < grid_cspace.size().second) {
+            if (x >= 0 && x < x_bounds && y >= 0 && y < y_bounds) {
                 if (distance[x][y] > 1 && distance[x][y] < min_distance) {  // Follow decreasing distance
                     min_distance = distance[x][y];
                     next_cell = {x, y};
@@ -314,23 +443,34 @@ amp::Path2D MyWaveFrontAlgorithm::planInCSpace(const Eigen::Vector2d& q_init, co
             }
         }
 
-
-        if (next_cell == std::pair<int, int>{-1, -1}) {
-            if (i == grid_cspace.size().first - 1) {
-                current_cell = {0, j};
-                continue;
-            } else if (i == 0) {
-                current_cell = {grid_cspace.size().first - 1, j};
-                continue;
-            } else if (j == grid_cspace.size().second - 1) {
-                current_cell = {i, 0};
-                continue;
-            } else {
-                std::cout << "Error: No valid next cell found" << std::endl;
-                break;
+        if(isManipulator){ // If I am a manipulator, then I need to wrap around the grid and brushfire finsihed so a path exists
+            if (next_cell == std::pair<int, int>{-1, -1}) {
+                if (i == x_bounds - 1 && j == y_bounds - 1 && distance[0][0] > 1) { // Top right
+                    next_cell = {0, 0};
+                }
+                else if (i == 0 && j == 0 && distance[x_bounds - 1][y_bounds - 1]  > 1) { // Bottom left
+                    next_cell = {x_bounds - 1, y_bounds - 1};
+                }
+                else if (i == x_bounds - 1 && distance[0][j]  > 1) { // Top row
+                    next_cell = {0, j};
+                }
+                else if (i == 0 && distance[x_bounds - 1][j]  > 1) { // Bottom row
+                    next_cell = {x_bounds - 1, j};
+                }
+                else if (j == 0 && distance[i][y_bounds - 1]  > 1) { // Left column
+                    next_cell = {i, y_bounds - 1};
+                }
+                else if (j == y_bounds - 1 && distance[i][0]  > 1) { // Right column
+                    next_cell = {i, 0};
+                }
+                else {
+                    std::cout << "Bruh what: i =  " << i << " j = " << j << " current_distance = " << current_distance << std::endl;
+                    break;
+                }
             }
         }
-        
+
+
         // Given the next cell, find the real waypoint for this cell
         current_cell = next_cell;
         i = current_cell.first;
@@ -354,12 +494,16 @@ amp::Path2D MyWaveFrontAlgorithm::planInCSpace(const Eigen::Vector2d& q_init, co
         double x1 = x1_min + j * x1_step;
 
         Eigen::Vector2d waypoint = Eigen::Vector2d(x0, x1);
+
         path.waypoints.push_back(waypoint);
         itr++;
     }
-    std::cout << " and found a path in " << itr << " iterations" << std::endl;
-
-    path.waypoints.push_back(q_goal);
+    path.waypoints.push_back(q_goal_new);
+    if (isManipulator) {
+        Eigen::Vector2d bounds0 = Eigen::Vector2d(0.0, 0.0);
+        Eigen::Vector2d bounds1 = Eigen::Vector2d(2*M_PI, 2*M_PI);
+        amp::unwrapWaypoints(path.waypoints, bounds0, bounds1);
+    }
     return path;
 }
 

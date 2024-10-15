@@ -59,23 +59,23 @@ int main(int argc, char** argv) {
     // Visualizer::makeFigure(manipulator2, IK_State);
 
 
-    // //Create the collision space constructor
-    // MyManipulator2D manipulator3(std::vector<double>{1.0, 1.0});
-    // std::size_t n_cells = 500;
+    //Create the collision space constructor
+    MyManipulator2D manipulator3(std::vector<double>{1.0, 1.0});
+    std::size_t n_cells = 500;
 
-    // MyManipulatorCSConstructor cspace_constructor(n_cells);
+    MyManipulatorCSConstructor cspace_constructor(n_cells);
 
-    // // Create the collision space using a given manipulator and environment
-    // std::unique_ptr<amp::GridCSpace2D> cspace = cspace_constructor.construct(manipulator3, HW4::getEx3Workspace3());
+    // Create the collision space using a given manipulator and environment
+    std::unique_ptr<amp::GridCSpace2D> cspace = cspace_constructor.construct(manipulator3, HW4::getEx3Workspace3());
 
-    // // You can visualize your cspace 
-    // Visualizer::makeFigure(*cspace);
+    // You can visualize your cspace 
+    Visualizer::makeFigure(*cspace);
 
     // Visualizer::makeFigure(HW4::getEx3Workspace1());
 
-    Visualizer::showFigures();
+    //Visualizer::showFigures();
 
     // Grade method
-    //amp::HW4::grade<MyManipulator2D>(cspace_constructor, "aidan.bagley@colorado.edu", argc, argv);
+    amp::HW4::grade<MyManipulator2D>(cspace_constructor, "aidan.bagley@colorado.edu", argc, argv);
     return 0;
 }

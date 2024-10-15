@@ -102,7 +102,6 @@ amp::ManipulatorState MyManipulator2D::getConfigurationFromIK(const Eigen::Vecto
         return joint_angles;
 
 
-        return joint_angles;
     } else if (nLinks() == 3) {
 
         return joint_angles;
@@ -113,3 +112,4 @@ amp::ManipulatorState MyManipulator2D::getConfigurationFromIK(const Eigen::Vecto
 
     return joint_angles;
 }
+
