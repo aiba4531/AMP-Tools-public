@@ -40,6 +40,14 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
         int current_node = open_set.top().second;
         open_set.pop();
 
+        if (current_node < 0 || current_node >= num_nodes) {
+        //     std::cerr << "Error: Invalid current node: " << current_node << std::endl;
+        //     std::cerr << "Parent node: " << parent_map[current_node] << std::endl;
+        //     std::cerr << "Number of nodes: " << num_nodes << std::endl;
+        //     std::cerr << "Laste node index: " << graph->nodes().back() << std::endl;
+            return result; // Exit early on error
+        }
+
         // If goal node is reached, reconstruct the path
         if (current_node == goal_node) {
             result.success = true;
@@ -62,9 +70,29 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
         // Mark the node as visited
         closed_set[current_node] = true;
 
+
         // Access neighboring nodes and corresponding edge costs
         const auto& neighbors = graph->children(current_node);  // Get neighbors of current_node
         const auto& edges = graph->outgoingEdges(current_node);   // Get edge costs of current_node
+
+        // for (const auto& neighbor_node : neighbors) {
+        //     double edge_cost = edges[neighbor_node];
+        //     if (closed_set[neighbor_node]) {
+        //         continue; // Skip already visited nodes
+        //     }
+
+        //     // Calculate tentative g_cost for the neighbor
+        //     double tentative_g_cost = g_cost[current_node] + edge_cost;
+
+        //     // If a shorter path to the neighbor is found
+        //     if (tentative_g_cost < g_cost[neighbor_node]) {
+        //         parent_map[neighbor_node] = current_node;
+        //         g_cost[neighbor_node] = tentative_g_cost;
+        //         f_cost[neighbor_node] = g_cost[neighbor_node] + heuristic(neighbor_node);
+        //         open_set.push({f_cost[neighbor_node], neighbor_node});
+        //     }
+        // }
+        
 
         // Iterate over the neighbors of the current node
         for (int k = 0; k < neighbors.size(); k++) {
@@ -75,6 +103,7 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
                 continue; // Skip already visited nodes
             }
 
+
             // Calculate tentative g_cost for the neighbor
             double tentative_g_cost = g_cost[current_node] + edge_cost;
 
@@ -83,7 +112,6 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
                 parent_map[neighbor_node] = current_node;
                 g_cost[neighbor_node] = tentative_g_cost;
                 f_cost[neighbor_node] = g_cost[neighbor_node] + heuristic(neighbor_node);
-
                 open_set.push({f_cost[neighbor_node], neighbor_node});
             }
         }

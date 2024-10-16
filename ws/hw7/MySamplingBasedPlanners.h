@@ -5,16 +5,19 @@
 
 // Include the correct homework headers
 #include "hw/HW7.h"
+#include "hw/HW6.h"
+
 
 #include "MyAStar.h"
 
 class MyPRM : public amp::PRM2D {
     public:
         virtual amp::Path2D plan(const amp::Problem2D& problem) override; 
+        
 
     private:
-        int n = 20;
-        int r = 10; // Number of samples and radius of the circle
+        int n = 200;
+        int r = 5; // Number of samples and radius of the circle
 };
 
 class MyRRT : public amp::GoalBiasRRT2D {

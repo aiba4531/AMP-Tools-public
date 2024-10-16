@@ -1,15 +1,14 @@
 # include "MySamplingBasedPlanners.h"
 
-// Implement your PRM algorithm here
-amp::Path2D MyPRM::plan(const amp::Problem2D& problem) {
+// // Implement your PRM algorithm here
+// amp::Path2D MyPRM::plan(const amp::Problem2D& problem) {
+amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
+
     amp::Path2D path;
     
     // Create a shared pointer to the graph
     std::shared_ptr<amp::Graph<double>> graphPtr = std::make_shared<amp::Graph<double>>();
     std::map<amp::Node, Eigen::Vector2d> nodes;
-
-    // Add the start node to graph
-    nodes[0] = {0, problem.q_init};
 
     // Get the bounds of the workspace
     double x_max = problem.x_max;
@@ -22,9 +21,15 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem) {
     
     // Get the number of samples
     int n = MyPRM::n;
-    
-    // Take n random samples of points in the c-space
-    std::vector<Eigen::Vector2d> samples;
+    std::size_t idx = 0;
+
+    // Add the start point as a node
+    nodes[idx] = problem.q_init;
+    idx++;
+
+    // Add the goal point as a node
+    nodes[idx] = problem.q_goal;
+    idx++;
 
     // Generate n random samples in the c-space
     for (int i = 0; i < n; i++) {
@@ -34,29 +39,29 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem) {
 
         // If this sample is not in collision, add it to the list of samples
         if (!point_in_polygons(sample, problem)) {
-            samples.push_back(sample);
+            nodes[idx] = sample;
+            idx++;
         }
     }
-
-    // Check if the samples are collision free
-    std::vector<Eigen::Vector2d> collision_free_samples;
-    bool in_collision;
-    for (int i = 0; i < n; i++) {
-        in_collision = point_in_polygons(samples[i], problem);
-        if (in_collision == false) {
-            collision_free_samples.push_back(samples[i]);
-        }
-    }
-
+    
     // Connect the nodes that are within a certain distance r of each other
     double r = MyPRM::r;
     std::vector<std::tuple<amp::Node, amp::Node, double>> edges;
-    for (amp::Node i = 0; i < collision_free_samples.size(); i++) {
-        for (amp::Node j = 0; j < collision_free_samples.size(); j++) {
+
+   // For every node in the graph 
+    for (amp::Node i = 0; i < nodes.size(); i++) {
+        for (amp::Node j = 0; j < nodes.size(); j++) {
             if (i != j) {
-                double distance = (collision_free_samples[i] - collision_free_samples[j]).norm();
+
+                // Get the distance between the two nodes
+                double distance = (nodes[i] - nodes[j]).norm();
+
+                // If the distance is less than r, check if the edge is collision free
                 if (distance < r) {
-                    if (line_segment_in_polygon(all_primitives, std::make_tuple(collision_free_samples[i], collision_free_samples[j])) == false) {
+
+                    // Line segment between the two nodes [point, relative vector]
+                    std::tuple<Eigen::Vector2d, Eigen::Vector2d> line_segment = std::make_tuple(nodes[i], nodes[j]-nodes[i]);
+                    if (!line_segment_in_polygon(all_primitives, line_segment)) {
                         edges.push_back(std::make_tuple(i,j, distance));
                     }
                 }
@@ -64,35 +69,37 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem) {
         }
     }
 
-    // Run A* on the graph to find the shortest path
-    std::map<amp::Node, Eigen::Vector2d> nodes;
-    
-    for (int i = 0; i < collision_free_samples.size(); i++) {
-        nodes[i] = collision_free_samples[i];
-    }
 
+    // Connect the edges in the graph
     for (const auto& [from, to, weight] : edges) {
+        //std::cout << "Connecting nodes: " << from << " and " << to << " with weight: " << weight << std::endl;
         graphPtr->connect(from, to, weight);
     }
 
-    graphPtr->print();
-
     MyAStarAlgo aStar;
+    
     amp::ShortestPathProblem shortestPathProblem;
     shortestPathProblem.graph = graphPtr;
-    shortestPathProblem.goal_node = nodes[nodes.size() - 2];
-    shortestPathProblem.init_node = nodes[nodes.size() - 1];
-    shortestPathProblem.heuristic = MyAStarAlgo::heuristic;
-    amp::GraphSearchResult result = aStar.search(shortestPathProblem, MyAStarAlgo::heuristic);
-    
-    // std::vector<Eigen::Vector2d> points = {{3, 3}, {4, 5}, {5, 3}, {6, 5}, {5, 7}, {7, 3}}; // Points to add to the graph
-    // for (amp::Node i = 0; i < points.size(); ++i) nodes[i] = points[i]; // Add point-index pair to the map
-    // std::vector<std::tuple<amp::Node, amp::Node, double>> edges = {{0, 4, 1}, {0, 5, 1}, {4, 5, 1}, {1, 2, 1}, {1, 3, 1}, {2, 3, 1}}; // Edges to connect
-    // for (const auto& [from, to, weight] : edges) graphPtr->connect(from, to, weight); // Connect the edges in the graph
-    // //graphPtr->print();
+    shortestPathProblem.init_node = 0;
+    shortestPathProblem.goal_node = 1;
 
+    amp::LookupSearchHeuristic heuristic;
 
+    for (const auto& [node, coordinates] : nodes) {
+        heuristic.heuristic_values[node] = 0;//(coordinates - problem.q_goal).norm();
+    }
+
+    MyAStarAlgo::GraphSearchResult result = aStar.search(shortestPathProblem, heuristic);
     
+    // Reconstruct the path from goal to start using the parent map
+    while (!result.node_path.empty()) {
+        path.waypoints.push_back(nodes[result.node_path.front()]);
+        result.node_path.pop_front();
+    }
+    
+    
+    // amp::Visualizer::makeFigure(problem, path, *graphPtr, nodes);
+    // amp::Visualizer::showFigures();
 
     return path;
 
@@ -122,7 +129,7 @@ bool point_in_polygons(Eigen::Vector2d point, const amp::Problem2D& problem) {
 
     // For every obstacle in the problem
     for (int i = 0; i < problem.obstacles.size(); i++) {
-
+        bool inside = false;
         // Get the vertices of the polygon
         std::vector<Eigen::Vector2d> polygon = problem.obstacles[i].verticesCW();
         int num_vertices = polygon.size();
@@ -150,7 +157,7 @@ bool point_in_polygons(Eigen::Vector2d point, const amp::Problem2D& problem) {
                         // Check if the point is on the same line as the edge or to the left of the x-intersection
                         if (p1.x() == p2.x() || x <= x_intersection) {
                             // Return the point is inside this polygon
-                            return true;
+                            inside = !inside;
                         }
                     }
                 }
@@ -159,6 +166,12 @@ bool point_in_polygons(Eigen::Vector2d point, const amp::Problem2D& problem) {
             // Store the current point as the first point for the next iteration
             p1 = p2;
         }
+
+        // If the point is inside the polygon, return true
+        if (inside) {
+            return true;
+        }
+    
     }
     // Return the value of the inside flag
     return false;
@@ -168,7 +181,6 @@ bool point_in_polygons(Eigen::Vector2d point, const amp::Problem2D& problem) {
 bool line_segment_in_polygon(const std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives, const std::tuple<Eigen::Vector2d, Eigen::Vector2d> next_step){
     
     // Check for collisions with all obstacle primitives
-    std::tuple<int, int> intersecting_primitive;
     for (int i = 0; i < all_primitives.size(); i++) {
         for (int j = 0; j < all_primitives[i].size(); j++) {
 
@@ -203,10 +215,10 @@ bool line_segment_in_polygon(const std::vector<std::vector<std::tuple<Eigen::Vec
 }
 
 // Define all linear primitives for each obstacle
-std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> get_all_primitives(const amp::Environment2D& env) {
+std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> get_all_primitives(const amp::Environment2D& problem) {
     std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives;
-    for (int i = 0; i < env.obstacles.size(); i++) {
-        std::vector<Eigen::Vector2d> verticies = env.obstacles[i].verticesCW();
+    for (int i = 0; i < problem.obstacles.size(); i++) {
+        std::vector<Eigen::Vector2d> verticies = problem.obstacles[i].verticesCW();
         std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>> primitives;
         
         for (int j = 0; j < verticies.size(); j++) {
