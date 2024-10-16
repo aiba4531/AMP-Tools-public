@@ -13,10 +13,14 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
     // std::map<amp::Node, Eigen::Vector2d> nodes;
 
     // Get the bounds of the workspace
-    double x_max = problem.x_max;
-    double x_min = problem.x_min;
-    double y_max = problem.y_max;
-    double y_min = problem.y_min;
+    // double x_max = problem.x_max;
+    // double x_min = problem.x_min;
+    // double y_max = problem.y_max;
+    // double y_min = problem.y_min;
+    double x_max = 11;
+    double x_min = -1;
+    double y_max = 3;
+    double y_min = -3;
 
     // Get all linear primitives
     std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives = get_all_primitives(problem);
@@ -32,7 +36,7 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
     // Add the goal point as a node
     nodes[idx] = problem.q_goal;
     idx++;
-
+    
     // Generate n random samples in the c-space
     for (int i = 0; i < n; i++) {
         double x = x_min + static_cast <double> (rand()) / (static_cast <double> (RAND_MAX / (x_max - x_min)));
@@ -49,7 +53,6 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
     // Connect the nodes that are within a certain distance r of each other
     double r = MyPRM::r;
     amp::LookupSearchHeuristic heuristic;
-
 
    // For every node in the graph 
     for (amp::Node i = 0; i < nodes.size(); i++) {
@@ -73,15 +76,20 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
         }
     }
 
-
+    if (graphPtr->nodes().size() == 0) {
+        return path;
+    }
 
     MyAStarAlgo aStar;
-    
     amp::ShortestPathProblem shortestPathProblem;
     shortestPathProblem.graph = graphPtr;
     shortestPathProblem.init_node = 0;
     shortestPathProblem.goal_node = 1;
     MyAStarAlgo::GraphSearchResult result = aStar.search(shortestPathProblem, heuristic);
+
+    if (!result.success) {
+        return path;
+    }
     
     // Reconstruct the path from goal to start using the parent map
     while (!result.node_path.empty()) {

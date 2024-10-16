@@ -220,6 +220,7 @@ void amp::Visualizer::makeFigure(const Problem2D& prob, const Path2D& path, cons
     createAxes(prob);
     createAxes(coordinate_map, [&](amp::Node node) -> Eigen::Vector2d {return node_to_coordinate.at(node);});
     createAxes(path);
+
 }
 
 void amp::Visualizer::showFigures() {

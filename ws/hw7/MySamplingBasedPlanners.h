@@ -21,10 +21,17 @@ class MyPRM : public amp::PRM2D {
             return nodes;
         }
 
-    private:
-        int n = 1500;
-        int r = 1.5; // Number of samples and radius of the circle
+        void set_n(int n) {
+            this->n = n;
+        }
 
+        void set_r(int r) {
+            this->r = r;
+        }
+
+
+    private:
+        int n, r;
         std::shared_ptr<amp::Graph<double>> graphPtr;
         std::map<amp::Node, Eigen::Vector2d> nodes;
 };

@@ -16,6 +16,7 @@ MyAStarAlgo::GraphSearchResult MyAStarAlgo::search(const amp::ShortestPathProble
 
     // Get the number of nodes in graph
     int num_nodes = graph->nodes().size();
+
     
     // Priority queue (min-heap) to store nodes with their f_cost
     std::priority_queue<std::pair<double, int>, std::vector<std::pair<double, int>>, std::greater<std::pair<double, int>>> open_set;
