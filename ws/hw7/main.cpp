@@ -23,7 +23,10 @@ int main(int argc, char** argv) {
     //Problem2D problem = HW2::getWorkspace1();
     Problem2D problem = HW2::getWorkspace2();
     MyPRM prm;
-    Path2D path = prm.plan(problem);    
+    Path2D path = prm.plan(problem);
+    std::shared_ptr<Graph<double>> graphPtr = prm.get_graphPtr();
+    std::map<Node, Eigen::Vector2d> nodes = prm.get_nodes();
+    Visualizer::makeFigure(problem, path, *graphPtr, nodes);
     //Visualizer::makeFigure(problem, path, *graphPtr, nodes);
 
     // Generate a random problem and test RRT
@@ -31,9 +34,9 @@ int main(int argc, char** argv) {
     // Path2D path;
     // HW7::generateAndCheck(rrt, path, problem);
     // Visualizer::makeFigure(problem, path, *graphPtr, nodes);
-    //Visualizer::showFigures();
+    Visualizer::showFigures();
 
     // Grade method
-    HW7::grade<MyPRM, MyRRT>("firstName.lastName@colorado.edu", argc, argv, std::make_tuple(), std::make_tuple());
+    //HW7::grade<MyPRM, MyRRT>("firstName.lastName@colorado.edu", argc, argv, std::make_tuple(), std::make_tuple());
     return 0;
 }

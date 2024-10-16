@@ -7,8 +7,10 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
     amp::Path2D path;
     
     // Create a shared pointer to the graph
-    std::shared_ptr<amp::Graph<double>> graphPtr = std::make_shared<amp::Graph<double>>();
-    std::map<amp::Node, Eigen::Vector2d> nodes;
+    graphPtr = std::make_shared<amp::Graph<double>>();
+    nodes = std::map<amp::Node, Eigen::Vector2d>();
+    // std::shared_ptr<amp::Graph<double>> graphPtr = std::make_shared<amp::Graph<double>>();
+    // std::map<amp::Node, Eigen::Vector2d> nodes;
 
     // Get the bounds of the workspace
     double x_max = problem.x_max;
@@ -46,7 +48,8 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
     
     // Connect the nodes that are within a certain distance r of each other
     double r = MyPRM::r;
-    std::vector<std::tuple<amp::Node, amp::Node, double>> edges;
+    amp::LookupSearchHeuristic heuristic;
+
 
    // For every node in the graph 
     for (amp::Node i = 0; i < nodes.size(); i++) {
@@ -62,7 +65,8 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
                     // Line segment between the two nodes [point, relative vector]
                     std::tuple<Eigen::Vector2d, Eigen::Vector2d> line_segment = std::make_tuple(nodes[i], nodes[j]-nodes[i]);
                     if (!line_segment_in_polygon(all_primitives, line_segment)) {
-                        edges.push_back(std::make_tuple(i,j, distance));
+                        graphPtr->connect(i, j, distance);
+                        heuristic.heuristic_values[i] =  (nodes[i] - problem.q_goal).norm();
                     }
                 }
             }
@@ -70,11 +74,6 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
     }
 
 
-    // Connect the edges in the graph
-    for (const auto& [from, to, weight] : edges) {
-        //std::cout << "Connecting nodes: " << from << " and " << to << " with weight: " << weight << std::endl;
-        graphPtr->connect(from, to, weight);
-    }
 
     MyAStarAlgo aStar;
     
@@ -82,13 +81,6 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
     shortestPathProblem.graph = graphPtr;
     shortestPathProblem.init_node = 0;
     shortestPathProblem.goal_node = 1;
-
-    amp::LookupSearchHeuristic heuristic;
-
-    for (const auto& [node, coordinates] : nodes) {
-        heuristic.heuristic_values[node] = 0;//(coordinates - problem.q_goal).norm();
-    }
-
     MyAStarAlgo::GraphSearchResult result = aStar.search(shortestPathProblem, heuristic);
     
     // Reconstruct the path from goal to start using the parent map

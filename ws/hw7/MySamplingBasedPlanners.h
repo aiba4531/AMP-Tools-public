@@ -13,11 +13,20 @@
 class MyPRM : public amp::PRM2D {
     public:
         virtual amp::Path2D plan(const amp::Problem2D& problem) override; 
-        
+
+        std::shared_ptr<amp::Graph<double>> get_graphPtr() const {
+            return graphPtr;
+        }
+        const std::map<amp::Node, Eigen::Vector2d> get_nodes() const {
+            return nodes;
+        }
 
     private:
-        int n = 200;
-        int r = 5; // Number of samples and radius of the circle
+        int n = 1500;
+        int r = 1.5; // Number of samples and radius of the circle
+
+        std::shared_ptr<amp::Graph<double>> graphPtr;
+        std::map<amp::Node, Eigen::Vector2d> nodes;
 };
 
 class MyRRT : public amp::GoalBiasRRT2D {
