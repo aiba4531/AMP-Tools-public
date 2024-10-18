@@ -3,22 +3,16 @@
 // // Implement your PRM algorithm here
 // amp::Path2D MyPRM::plan(const amp::Problem2D& problem) {
 amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
-
     // Create a path
     amp::Path2D path;
-    
-    // Create a shared pointer to the graph
-    graphPtr = std::make_shared<amp::Graph<double>>();
-    nodes = std::map<amp::Node, Eigen::Vector2d>();
 
-    // std::shared_ptr<amp::Graph<double>> graphPtr = std::make_shared<amp::Graph<double>>();
-    // std::map<amp::Node, Eigen::Vector2d> nodes = std::map<amp::Node, Eigen::Vector2d>();
- 
     // Get the bounds of the workspace
     double x_max = problem.x_max;
     double x_min = problem.x_min;
     double y_max = problem.y_max;
     double y_min = problem.y_min;
+
+    // // Problem 1 bounds
     // double x_max = 11;
     // double x_min = -1;
     // double y_max = 3;
@@ -28,7 +22,6 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
     std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives = get_all_primitives(problem);
     
     // Get the number of samples
-    int n = MyPRM::n;
     std::size_t idx = 0;
 
     // Add the start point as a node
@@ -53,9 +46,9 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
     }
     
     // Connect the nodes that are within a certain distance r of each other
-    double r = MyPRM::r;
     amp::LookupSearchHeuristic heuristic;
-    
+    std::vector<std::tuple<amp::Node, amp::Node, double>> edges;
+
    // For every node in the graph 
     for (amp::Node i = 0; i < nodes.size(); i++) {
         for (amp::Node j = 0; j < nodes.size(); j++) {
@@ -66,28 +59,40 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
 
                 // If the distance is less than r, check if the edge is collision free
                 if (distance < r) {
-
                     // Line segment between the two nodes [point, relative vector]
                     std::tuple<Eigen::Vector2d, Eigen::Vector2d> line_segment = std::make_tuple(nodes[i], nodes[j]-nodes[i]);
                     if (!line_segment_in_polygon(all_primitives, line_segment)) {
-                        graphPtr->connect(i, j, distance);
+                        edges.push_back(std::make_tuple(i, j, distance));
                     }
                 }
             }
         }
     }
 
-    for (amp::Node i = 0; i < nodes.size(); i++) {
-        heuristic.heuristic_values[i] =  (nodes[i] - problem.q_goal).norm();
+    graphPtr = std::make_shared<amp::Graph<double>>();
+    for (const auto& [from, to, weight] : edges) {
+        graphPtr->connect(from, to, weight);
     }
 
+    // Set the heuristic values for A*
+    for (amp::Node i = 0; i < nodes.size(); i++) {
+        heuristic.heuristic_values[i] = (nodes[i] - problem.q_goal).norm();
+    }
+
+
+    // amp::Visualizer::makeFigure(problem, path, *graphPtr, nodes);
+    // amp::Visualizer::showFigures();
+
+    // Run A* to find the shortest path
     MyAStarAlgo aStar;
     amp::ShortestPathProblem shortestPathProblem;
     shortestPathProblem.graph = graphPtr;
     shortestPathProblem.init_node = 0;
     shortestPathProblem.goal_node = 1;
-    MyAStarAlgo::GraphSearchResult result = aStar.search(shortestPathProblem, heuristic);
 
+    
+    MyAStarAlgo::GraphSearchResult result = aStar.search(shortestPathProblem, heuristic);
+    
     if (!result.success) {
         return path;
     }
@@ -97,7 +102,6 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
         path.waypoints.push_back(nodes[result.node_path.front()]);
         result.node_path.pop_front();
     }
-
     return path;
 }
 
