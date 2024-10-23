@@ -7,16 +7,16 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
     amp::Path2D path;
 
     // Get the bounds of the workspace
-    double x_max = problem.x_max;
-    double x_min = problem.x_min;
-    double y_max = problem.y_max;
-    double y_min = problem.y_min;
+    // double x_max = problem.x_max;
+    // double x_min = problem.x_min;
+    // double y_max = problem.y_max;
+    // double y_min = problem.y_min;
 
-    // // Problem 1 bounds
-    // double x_max = 11;
-    // double x_min = -1;
-    // double y_max = 3;
-    // double y_min = -3;
+    // Problem 1 bounds
+    double x_max = 11;
+    double x_min = -1;
+    double y_max = 3;
+    double y_min = -3;
 
     // Get all linear primitives
     std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives = get_all_primitives(problem);
@@ -89,10 +89,9 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
     shortestPathProblem.graph = graphPtr;
     shortestPathProblem.init_node = 0;
     shortestPathProblem.goal_node = 1;
-
     
     MyAStarAlgo::GraphSearchResult result = aStar.search(shortestPathProblem, heuristic);
-    
+
     if (!result.success) {
         return path;
     }
@@ -102,36 +101,236 @@ amp::Path2D MyPRM::plan(const amp::Problem2D& problem){
         path.waypoints.push_back(nodes[result.node_path.front()]);
         result.node_path.pop_front();
     }
+
+    // Run Path smoothing
+    path = path_smoothing(path, problem, all_primitives);
+
     return path;
 }
 
 
+// // Implement your RRT algorithm here
+// amp::Path2D MyRRT::plan(const amp::Problem2D& problem) {
+
+//     // Create a path
+//     amp::Path2D path;
+
+//      // Get the bounds of the workspace
+//     double x_max = problem.x_max;
+//     double x_min = problem.x_min;
+//     double y_max = problem.y_max;
+//     double y_min = problem.y_min;
+
+//     double x_max = 11;
+//     double x_min = -1;
+//     double y_max = 3;
+//     double y_min = -3;
+
+//     // Create a tree with root at the start node
+//     graphPtr = std::make_shared<amp::Graph<double>>();
+//     nodes = std::map<amp::Node, Eigen::Vector2d>();
+
+//     // Get all linear primitives
+//     std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives = get_all_primitives(problem);
+
+//     // Get the distance for convergence
+//     amp::LookupSearchHeuristic heuristic;
+
+//     // Define an index to update nodes 
+//     std::size_t idx = 0;
+//     int num_itr = 0;
+
+//     // Add the start point as a node
+//     nodes[idx] = problem.q_init;
+//     heuristic.heuristic_values[idx] =  0;
+//     idx++;
+
+//     // Distant to goal
+//     double distance;
+//     Eigen::Vector2d sample;
+
+//     // While the goal is not reached or a mumber of iterations is not reached
+//     while (num_itr < n) {
+
+//         // Sample the goal with probability goal_bias
+//         double prob = static_cast <double> (rand()) / static_cast <double> (RAND_MAX);
+        
+//         if (prob < MyRRT::goal_bias) {
+//             sample = problem.q_goal;
+
+
+//             amp::Node nearest_node = 0;
+//             double min_distance = std::numeric_limits<double>::max();
+//             double curr_distance = 0;
+//             for (const auto& [node, point] : nodes) {
+//                 curr_distance = (point - sample).norm();
+//                 if (curr_distance < min_distance) {
+//                     min_distance = curr_distance;
+//                     nearest_node = node;
+//                 }
+//             }
+
+//             // Get the direction vector from the nearest node to the sample
+//             Eigen::Vector2d direction = (sample - nodes[nearest_node]).normalized();
+
+//             // Step size
+//             double r = MyRRT::r;
+
+//             // Get the next step in the direction of the sample
+//             Eigen::Vector2d next_step = nodes[nearest_node] + direction*r;
+
+//             // Get the relative vector between nearest node and next step
+//             std::tuple<Eigen::Vector2d, Eigen::Vector2d> line_segment = std::make_tuple(nodes[nearest_node], next_step-nodes[nearest_node]);
+
+//             if (!line_segment_in_polygon(all_primitives, line_segment)) {
+                
+//                 // Check if the goal is reached
+//                 double dist_to_goal = (next_step - problem.q_goal).norm();
+//                 if (dist_to_goal < epsilon) {
+//                     nodes[idx] = next_step;
+//                     graphPtr->connect(nearest_node, idx, r);
+//                     heuristic.heuristic_values[idx] =  0;
+//                     idx++;
+
+//                     nodes[idx] = problem.q_goal;
+//                     graphPtr->connect(idx-1, idx, epsilon);
+//                     heuristic.heuristic_values[idx] =  0;
+//                     break;
+//                 }
+                
+//                 nodes[idx] = next_step;
+//                 graphPtr->connect(nearest_node, idx, (nodes[nearest_node] - next_step).norm());
+//                 heuristic.heuristic_values[idx] =  0;
+//                 idx++;
+
+//                 continue;
+//             }
+//             continue;
+
+
+//         }
+//         else {
+//             // Generate a random sample in the c-space
+//             double x = x_min + static_cast <double> (rand()) / (static_cast <double> (RAND_MAX / (x_max - x_min)));
+//             double y = y_min + static_cast <double> (rand()) / (static_cast <double> (RAND_MAX / (y_max - y_min)));
+//             sample = Eigen::Vector2d(x, y);
+
+//             if (point_in_polygons(sample, problem)) {
+//                 continue;
+//             }
+//         }
+
+//         //std::cout << "Itr: " << num_itr << " sampling: " << sample.transpose();
+
+
+//         // Find the nearest node in the tree to the sample
+//         amp::Node nearest_node = 0;
+//         double min_distance = std::numeric_limits<double>::max();
+//         double curr_distance = 0;
+        
+//         for (const auto& [node, point] : nodes) {
+//             curr_distance = (point - sample).norm();
+//             if (curr_distance < min_distance) {
+//                 min_distance = curr_distance;
+//                 nearest_node = node;
+//             }
+//         }
+//         //std::cout << " where the nearest node is " << nearest_node << " located at " << nodes[nearest_node].transpose() << std::endl;
+
+//         // Get the direction vector from the nearest node to the sample
+//         Eigen::Vector2d direction = (sample - nodes[nearest_node]).normalized();
+
+//         // Step size
+//         r = MyRRT::r;
+
+//         // Get the next step in the direction of the sample
+//         Eigen::Vector2d next_step = nodes[nearest_node] + direction*r;
+
+//         // Get the relative vector between nearest node and next step
+//         std::tuple<Eigen::Vector2d, Eigen::Vector2d> line_segment = std::make_tuple(nodes[nearest_node], next_step-nodes[nearest_node]);
+
+//         if (line_segment_in_polygon(all_primitives, line_segment)) {
+//             continue;
+//         }
+
+
+//         // Check if the goal is reached
+//         double dist_to_goal = (next_step - problem.q_goal).norm();
+//         if (dist_to_goal < epsilon) {
+//             nodes[idx] = next_step;
+//             graphPtr->connect(nearest_node, idx, r);
+//             heuristic.heuristic_values[idx] =  0;
+//             idx++;
+
+//             nodes[idx] = problem.q_goal;
+//             graphPtr->connect(idx-1, idx, epsilon);
+//             heuristic.heuristic_values[idx] =  0;
+//             break;
+//         }
+        
+//         nodes[idx] = next_step;
+//         graphPtr->connect(nearest_node, idx, r);
+//         heuristic.heuristic_values[idx] =  0;//(nodes[idx] - problem.q_goal).norm();
+//         idx++;
+    
+//         num_itr++;
+//     }
+
+//     if (graphPtr->nodes().size() == 0) {
+//         return path;
+//     }
+    
+//     // graphPtr->print();
+
+//     // amp::Visualizer::makeFigure(problem, path, *graphPtr, nodes);
+//     // amp::Visualizer::showFigures();
+
+    
+//     MyAStarAlgo aStar;
+//     amp::ShortestPathProblem shortestPathProblem;
+//     shortestPathProblem.graph = graphPtr;
+//     shortestPathProblem.init_node = 0;
+//     shortestPathProblem.goal_node = idx;
+    
+//     MyAStarAlgo::GraphSearchResult result = aStar.search(shortestPathProblem, heuristic);
+
+//     if (!result.success) {
+//         return path;
+//     }
+    
+//     // Reconstruct the path from goal to start using the parent map
+//     while (!result.node_path.empty()) {
+//         path.waypoints.push_back(nodes[result.node_path.front()]);
+//         result.node_path.pop_front();
+//     }
+
+
+//     return path;
+// }
+
 // Implement your RRT algorithm here
 amp::Path2D MyRRT::plan(const amp::Problem2D& problem) {
+
+    // Create a path
     amp::Path2D path;
-    // path.waypoints.push_back(problem.q_init);
-    // path.waypoints.push_back(problem.q_goal);
 
-    // Create a tree with root at the start node
-    graphPtr = std::make_shared<amp::Graph<double>>();
-    nodes = std::map<amp::Node, Eigen::Vector2d>();
-
-    // Get the bounds of the workspace
+     // Get the bounds of the workspace
     double x_max = problem.x_max;
     double x_min = problem.x_min;
     double y_max = problem.y_max;
     double y_min = problem.y_min;
 
+    // double x_max = 11;
+    // double x_min = -1;
+    // double y_max = 3;
+    // double y_min = -3;
+
+    // Create a tree with root at the start node
+    graphPtr = std::make_shared<amp::Graph<double>>();
+    nodes = std::map<amp::Node, Eigen::Vector2d>();
+
     // Get all linear primitives
     std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives = get_all_primitives(problem);
-
-    // Get the number of samples
-    n = MyRRT::n;
-
-    // Get the distance for convergence
-    epsilon = MyRRT::epsilon;
-    amp::LookupSearchHeuristic heuristic;
-
 
     // Define an index to update nodes 
     std::size_t idx = 0;
@@ -139,44 +338,25 @@ amp::Path2D MyRRT::plan(const amp::Problem2D& problem) {
 
     // Add the start point as a node
     nodes[idx] = problem.q_init;
-    heuristic.heuristic_values[idx] =  0;
     idx++;
 
-    // Add the goal point as a node
-    // nodes[idx] = problem.q_goal;
-    // idx++;
-
-    // Define a heuristic for A*
+    // Distant to goal
     double distance;
     Eigen::Vector2d sample;
 
-
-    // While the goal is not reached
+    // While the goal is not reached or a mumber of iterations is not reached
     while (num_itr < n) {
-
 
         // Sample the goal with probability goal_bias
         double prob = static_cast <double> (rand()) / static_cast <double> (RAND_MAX);
+        
         if (prob < MyRRT::goal_bias) {
             sample = problem.q_goal;
 
-
-            amp::Node nearest_node = 0;
-            double min_distance = std::numeric_limits<double>::max();
-            double curr_distance = 0;
-            for (const auto& [node, point] : nodes) {
-                curr_distance = (point - sample).norm();
-                if (curr_distance < min_distance) {
-                    min_distance = curr_distance;
-                    nearest_node = node;
-                }
-            }
+            amp::Node nearest_node = closest_node(nodes, sample);
 
             // Get the direction vector from the nearest node to the sample
             Eigen::Vector2d direction = (sample - nodes[nearest_node]).normalized();
-
-            // Step size
-            double r = MyRRT::r;
 
             // Get the next step in the direction of the sample
             Eigen::Vector2d next_step = nodes[nearest_node] + direction*r;
@@ -184,66 +364,39 @@ amp::Path2D MyRRT::plan(const amp::Problem2D& problem) {
             // Get the relative vector between nearest node and next step
             std::tuple<Eigen::Vector2d, Eigen::Vector2d> line_segment = std::make_tuple(nodes[nearest_node], next_step-nodes[nearest_node]);
 
-            if (!line_segment_in_polygon(all_primitives, line_segment)) {
-                
-                // Check if the goal is reached
-                double dist_to_goal = (next_step - problem.q_goal).norm();
-                if (dist_to_goal < epsilon) {
-                    nodes[idx] = next_step;
-                    graphPtr->connect(nearest_node, idx, r);
-                    heuristic.heuristic_values[idx] =  0;
-                    idx++;
-
-                    nodes[idx] = problem.q_goal;
-                    graphPtr->connect(idx-1, idx, epsilon);
-                    heuristic.heuristic_values[idx] =  0;
-                    break;
-                }
-                
-                nodes[idx] = next_step;
-                graphPtr->connect(nearest_node, idx, (nodes[nearest_node] - next_step).norm());
-                heuristic.heuristic_values[idx] =  0;
-                idx++;
-
+            if (line_segment_in_polygon(all_primitives, line_segment)) {
                 continue;
             }
-            continue;
 
-
+             // Check if the goal can be reached
+             double dist_to_goal = (next_step - problem.q_goal).norm();
+             if (dist_to_goal < epsilon) {
+                 nodes[idx] = problem.q_goal;
+                 graphPtr->connect(nearest_node, idx, r + epsilon);
+                 break;
+             }
+             
+             // Otherwise step in the direction of the goal
+             nodes[idx] = next_step;
+             graphPtr->connect(nearest_node, idx, r);
+             idx++;
+             continue;
         }
-        else {
-            // Generate a random sample in the c-space
-            double x = x_min + static_cast <double> (rand()) / (static_cast <double> (RAND_MAX / (x_max - x_min)));
-            double y = y_min + static_cast <double> (rand()) / (static_cast <double> (RAND_MAX / (y_max - y_min)));
-            sample = Eigen::Vector2d(x, y);
 
-            if (point_in_polygons(sample, problem)) {
-                continue;
-            }
-        }
+         // Generate a random sample in the c-space
+         double x = x_min + static_cast <double> (rand()) / (static_cast <double> (RAND_MAX / (x_max - x_min)));
+         double y = y_min + static_cast <double> (rand()) / (static_cast <double> (RAND_MAX / (y_max - y_min)));
+         sample = Eigen::Vector2d(x, y);
 
-        //std::cout << "Itr: " << num_itr << " sampling: " << sample.transpose();
-
+         if (point_in_polygons(sample, problem)) {
+             continue;
+         }
 
         // Find the nearest node in the tree to the sample
-        amp::Node nearest_node = 0;
-        double min_distance = std::numeric_limits<double>::max();
-        double curr_distance = 0;
-        
-        for (const auto& [node, point] : nodes) {
-            curr_distance = (point - sample).norm();
-            if (curr_distance < min_distance) {
-                min_distance = curr_distance;
-                nearest_node = node;
-            }
-        }
-        //std::cout << " where the nearest node is " << nearest_node << " located at " << nodes[nearest_node].transpose() << std::endl;
+        amp::Node nearest_node = closest_node(nodes, sample);
 
         // Get the direction vector from the nearest node to the sample
         Eigen::Vector2d direction = (sample - nodes[nearest_node]).normalized();
-
-        // Step size
-        r = MyRRT::r;
 
         // Get the next step in the direction of the sample
         Eigen::Vector2d next_step = nodes[nearest_node] + direction*r;
@@ -255,39 +408,28 @@ amp::Path2D MyRRT::plan(const amp::Problem2D& problem) {
             continue;
         }
 
-
         // Check if the goal is reached
         double dist_to_goal = (next_step - problem.q_goal).norm();
         if (dist_to_goal < epsilon) {
-            nodes[idx] = next_step;
-            graphPtr->connect(nearest_node, idx, r);
-            heuristic.heuristic_values[idx] =  0;
-            idx++;
-
             nodes[idx] = problem.q_goal;
-            graphPtr->connect(idx-1, idx, epsilon);
-            heuristic.heuristic_values[idx] =  0;
+            graphPtr->connect(nearest_node, idx, r + epsilon);
             break;
         }
         
         nodes[idx] = next_step;
         graphPtr->connect(nearest_node, idx, r);
-        heuristic.heuristic_values[idx] =  0;//(nodes[idx] - problem.q_goal).norm();
         idx++;
     
         num_itr++;
     }
 
-    if (graphPtr->nodes().size() == 0) {
-        return path;
+    // Assign heursitics
+    amp::LookupSearchHeuristic heuristic;
+    for (amp::Node i = 0; i < nodes.size(); i++) {
+        heuristic.heuristic_values[i] = (nodes[i] - problem.q_goal).norm();
     }
     
-    // graphPtr->print();
-
-    // amp::Visualizer::makeFigure(problem, path, *graphPtr, nodes);
-    // amp::Visualizer::showFigures();
-
-    
+    // Run A* to find the shortest path
     MyAStarAlgo aStar;
     amp::ShortestPathProblem shortestPathProblem;
     shortestPathProblem.graph = graphPtr;
@@ -306,8 +448,68 @@ amp::Path2D MyRRT::plan(const amp::Problem2D& problem) {
         result.node_path.pop_front();
     }
 
+    return path;
+}
+
+
+// Closest node to 
+amp::Node closest_node(const std::map<amp::Node, Eigen::Vector2d>& nodes, const Eigen::Vector2d& sample) {
+    amp::Node nearest_node = 0;
+    double min_distance = std::numeric_limits<double>::max();
+    double curr_distance = 0;
+
+    for (const auto& [node, point] : nodes) {
+        curr_distance = (point - sample).norm();
+        if (curr_distance < min_distance) {
+            min_distance = curr_distance;
+            nearest_node = node;
+        }
+    }
+    return nearest_node;
+}
+
+// Implement your path smoothing algorithm here
+amp::Path2D path_smoothing(amp::Path2D path, const amp::Problem2D& problem, std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives){
+    // Using the path, if any two configurations can be conncted, remove the middle point
+
+    int max_iterations = 1000;
+    int iterations = 0;
+
+    while(iterations < max_iterations){
+        // Randomly selecct two points in the path
+        
+        int idx1 = rand() % path.waypoints.size();
+        int idx2 = rand() % path.waypoints.size();
+
+        // Ensure idx1 is less than idx2
+        if (idx1 > idx2) {
+            std::swap(idx1, idx2);
+        }
+
+        if (idx2 - idx1 < 2) {
+            iterations++;
+            continue; // Skip if there are not enough points between idx1 and idx2
+        }
+
+        if (idx1 == 0 || idx2 == path.waypoints.size() - 1) {
+            iterations++;
+            continue; // Skip if the points are at the start or end of the path
+        }
+
+        // Check if the two points can be connected
+        Eigen::Vector2d point1 = path.waypoints[idx1];
+        Eigen::Vector2d point2 = path.waypoints[idx2];
+        std::tuple<Eigen::Vector2d, Eigen::Vector2d> line_segment = std::make_tuple(point1, point2 - point1);
+
+        if (!line_segment_in_polygon(all_primitives, line_segment)) {
+            // If they can be connected, remove the middle points
+            path.waypoints.erase(path.waypoints.begin() + idx1 + 1, path.waypoints.begin() + idx2);
+        }
+        iterations++;
+    }
 
     return path;
+
 }
 
 // Checking if a point is inside a polygon

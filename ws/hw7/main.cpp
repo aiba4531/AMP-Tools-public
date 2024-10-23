@@ -85,43 +85,108 @@ using namespace amp;
 //     return 0;
     
 // }
-int main(int argc, char** argv) {
-    //HW7::hint(); // Consider implementing an N-dimensional planner 
 
-    // // Example of creating a graph and adding nodes for visualization
-    // std::shared_ptr<amp::Graph<double>> graphPtr = std::make_shared<amp::Graph<double>>();
-    // std::map<amp::Node, Eigen::Vector2d> nodes;
-    
-    // std::vector<Eigen::Vector2d> points = {{3, 3}, {4, 5}, {5, 3}, {6, 5}, {5, 7}, {7, 3}}; // Points to add to the graph
-    // for (amp::Node i = 0; i < points.size(); ++i) nodes[i] = points[i]; // Add point-index pair to the map
-    // std::vector<std::tuple<amp::Node, amp::Node, double>> edges = {{0, 4, 1}, {0, 5, 1}, {4, 5, 1}, {1, 2, 1}, {1, 3, 1}, {2, 3, 1}}; // Edges to connect
-    // for (const auto& [from, to, weight] : edges) graphPtr->connect(from, to, weight); // Connect the edges in the graph
-    //graphPtr->print();
 
-    // Test PRM on Workspace1 of HW2
-    Problem2D problem = HW5::getWorkspace1();
-    //Problem2D problem = HW2::getWorkspace1();
-    //Problem2D problem = HW2::getWorkspace2();
-    MyPRM prm(200, 1);
-    Path2D path = prm.plan(problem);
-    std::shared_ptr<Graph<double>> graphPtr = prm.get_graphPtr();
-    std::map<Node, Eigen::Vector2d> nodes = prm.get_nodes();
-    Visualizer::makeFigure(problem, path, *graphPtr, nodes);
+int main( int argc, char** argv ) {
+    // Test RRT on Workspace1 of HW2
+    Problem2D problem = HW2::getWorkspace2();
 
-    //Generate a random problem and test RRT
-    // MyRRT rrt;
-    // rrt.set_n(5000);
-    // rrt.set_r(0.5);
-    // rrt.set_goal_bias(0.05);
-    // rrt.set_epsilon(0.25);
-    // Path2D path_rrt = rrt.plan(problem);
-    // std::shared_ptr<Graph<double>> graphPtr_rrt = rrt.get_graphPtr();
-    // std::map<Node, Eigen::Vector2d> nodes_rrt = rrt.get_nodes();
-    // HW7::generateAndCheck(rrt, path, problem);
-    //Visualizer::makeFigure(problem, path_rrt, *graphPtr_rrt, nodes_rrt);
+    // For 100 runs
+    const int num_runs = 100;
+
+    // Variables to store the number of valid paths, run times, and path lengths
+    std::vector<double> valid_paths(1);
+    std::vector<std::vector<double>> run_times(1);
+    std::vector<std::vector<double>> path_lengths(1);
+
+    // Define the parameter combinations to test
+    const std::vector<double> n_values = {5000};
+    const std::vector<double> r_values = {0.5};
+    const std::vector<double> goal_bias_values = {0.05};
+    const std::vector<double> epsilon_values = {0.25};
+
+    for (int p = 0; p < n_values.size() ; p++){ // for each parameter combination
+
+        for (int i = 0; i < num_runs; i++) {
+            // Define the RRT object
+            MyRRT rrt(n_values[p], r_values[p], goal_bias_values[p], epsilon_values[p]);
+
+            // Time the planning process
+            auto start = std::chrono::high_resolution_clock::now();
+            Path2D path = rrt.plan(problem);
+            auto end = std::chrono::high_resolution_clock::now();
+
+            std::chrono::duration<double> elapsed = end - start;
+            run_times[p].push_back(elapsed.count()); 
+
+            // Valid path
+            if(path.waypoints.size() > 0) {
+                valid_paths[p]++;
+                path_lengths[p].push_back(path.length());
+            }
+
+            std::cout << "Finished run " << i << " of " << num_runs << " for n=" << n_values[p] << std::endl;
+        }
+    }
+
+    // Prepare data sets and labels for the box plot
+    std::list<std::vector<double>> run_times_data_sets = {run_times[0]};
+    std::list<std::vector<double>> path_lengths_data_sets = {path_lengths[0]};
+
+    // Prepare labels for the box plot
+    std::vector<std::string> labels = { "n=5000, r=0.1, goal_bias=0.05, epsilon=0.25"};
+
+    // Call makeBoxPlot with the prepared data sets and labels
+    Visualizer::makeBoxPlot(run_times_data_sets, labels, "RRT Run Times", "Parameter Combinations", "Run Times");
+    Visualizer::makeBoxPlot(path_lengths_data_sets, labels, "RRT Path Lengths", "Parameter Combinations", "Path Lengths");
+    Visualizer::makeBarGraph(valid_paths, labels, "RRT Valid Paths", "Parameter Combinations", "Valid Paths");
+
     Visualizer::showFigures();
 
-    // Grade method
-    //HW7::grade<MyPRM, MyRRT>("aidan.bagley@colorado.edu", argc, argv, std::make_tuple(), std::make_tuple());
     return 0;
-}
+}  // end of main
+
+// int main(int argc, char** argv) {
+
+//     // Test PRM on Workspace1 of HW2
+//     Problem2D problem = HW2::getWorkspace2();
+//     // for (int i = 0; i < 100; i++){
+//     //     MyPRM prm(500, 2.0);
+//     //     Path2D path = prm.plan(problem);
+//     //     std::shared_ptr<Graph<double>> graphPtr = prm.get_graphPtr();
+//     //     std::map<Node, Eigen::Vector2d> nodes = prm.get_nodes();
+        
+//     //     if (path.waypoints.size() > 0){
+//     //         std::cout << "Path length:" << path.length()  << std::endl;
+
+//     //         std::shared_ptr<Graph<double>> graphPtr = prm.get_graphPtr();
+//     //         std::map<Node, Eigen::Vector2d> nodes = prm.get_nodes();
+//     //         Visualizer::makeFigure(problem, path, *graphPtr, nodes);
+//     //         break;
+
+//     //     }
+//     // }
+
+//     for (int i = 0; i < 100; i++){
+//         MyRRT rrt(5000, 0.5, 0.05, 0.25);
+//         Path2D path = rrt.plan(problem);
+//         std::shared_ptr<Graph<double>> graphPtr = rrt.get_graphPtr();
+//         std::map<Node, Eigen::Vector2d> nodes = rrt.get_nodes();
+        
+//         if (path.waypoints.size() > 0){
+//             std::cout << "Path length:" << path.length()  << std::endl;
+
+//             std::shared_ptr<Graph<double>> graphPtr = rrt.get_graphPtr();
+//             std::map<Node, Eigen::Vector2d> nodes = rrt.get_nodes();
+//             Visualizer::makeFigure(problem, path, *graphPtr, nodes);
+//             break;
+
+//         }
+//     }
+
+//     Visualizer::showFigures();
+
+//     // Grade method
+//     // HW7::grade<MyPRM, MyRRT>("aidan.bagley@colorado.edu", argc, argv, std::make_tuple(), std::make_tuple());
+//     return 0;
+// }
