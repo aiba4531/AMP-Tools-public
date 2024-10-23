@@ -314,7 +314,7 @@ amp::Path2D MyRRT::plan(const amp::Problem2D& problem) {
     // Create a path
     amp::Path2D path;
 
-     // Get the bounds of the workspace
+    // Get the bounds of the workspace
     double x_max = problem.x_max;
     double x_min = problem.x_min;
     double y_max = problem.y_max;
