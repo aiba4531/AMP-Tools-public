@@ -15,7 +15,7 @@ class MyCentralPlanner : public amp::CentralizedMultiAgentRRT {
     public:
 
         // Default constructor
-        MyCentralPlanner() : r(1.0), goal_bias(0.05), max_itr(1000), epsilon(0.25) {}
+        MyCentralPlanner() : r(1.0), goal_bias(0.05), max_itr(1000), epsilon(1.25) {}
 
         // Constructor with parameters
         MyCentralPlanner(double r, double goal_bias, double max_itr, double epsilon) : r(r), goal_bias(goal_bias), max_itr(max_itr), epsilon(epsilon) {}
