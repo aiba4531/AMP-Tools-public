@@ -56,10 +56,10 @@ amp::MultiAgentPath2D MyCentralPlanner::plan(const amp::MultiAgentProblem2D& pro
     while (itr < max_itr) {
 
         if (is_in_goal(current_state, goal_state, epsilon)) {
-            std::cout << "Reached goal state!" << std::endl;
+            std::cout << "Reached goal state! ";
 
             for (int i = 0; i < num_agents; i++) {
-                std::cout << "Agent " << i << "  State: " << current_state[i * 2] << ", " << current_state[i * 2 + 1] << std::endl;
+                std::cout << "Agent " << i << "  State: " << current_state[i * 2] << ", " << current_state[i * 2 + 1] << ", ";
                 amp::Node itr_node = current_node;
 
                 // Add the goal state to the path
@@ -74,6 +74,7 @@ amp::MultiAgentPath2D MyCentralPlanner::plan(const amp::MultiAgentProblem2D& pro
                 path.agent_paths[i].waypoints.push_back(initial_state.segment<2>(i * 2));
                 std::reverse(path.agent_paths[i].waypoints.begin(), path.agent_paths[i].waypoints.end());
             }
+            std::cout << "and completed planning in " << itr << " iterations." << std::endl;
             break; // Exit if the current state is in the goal
         }
         
@@ -214,8 +215,6 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
         // Let the current state be the initial state
         current_state = initial_state;
 
-        std::cout << "Planning for agent " << i << " with initial state: " << current_state.transpose() << " and goal state: " << goal_state.transpose() << std::endl;
-
         // Define the first node to have initial state and parent of -1
         nodes[i][0] = current_state;
         parent_map[i][0] = -1;
@@ -227,7 +226,6 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
         while (itr < max_itr) {
 
             if (is_agent_in_goal(current_state, goal_state, epsilon)) {
-                std::cout << "Agent " << i << " Reached goal state!" << std::endl;
                 amp::Node itr_node = current_node[i];
                 path.agent_paths[i].waypoints.push_back(goal_state);
                 while (itr_node != -1) {
@@ -360,7 +358,7 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
             break;
 
         } else {
-            std::cout << "Agent " << i << " completed planning in " << itr << " iterations." << std::endl; 
+            std::cout << "Agent " << i << " reached goal state and completed planning in " << itr << " iterations." << std::endl; 
         }
     }
 
