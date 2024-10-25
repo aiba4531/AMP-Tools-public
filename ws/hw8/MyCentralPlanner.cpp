@@ -14,6 +14,7 @@ amp::MultiAgentPath2D MyCentralPlanner::plan(const amp::MultiAgentProblem2D& pro
 
     // Number of agents    
     int num_agents = problem.numAgents(); 
+    std::vector<bool> agents_at_goal(num_agents, false); // Track agents that have reached their goal
 
     // Get the bounds of the workspace
     double x_max = problem.x_max;
@@ -21,180 +22,153 @@ amp::MultiAgentPath2D MyCentralPlanner::plan(const amp::MultiAgentProblem2D& pro
     double y_max = problem.y_max;
     double y_min = problem.y_min;
 
-    // Create a vector to store the initial states of the agents
-    std::vector<Eigen::Vector2d> initial_states, current_states, goal_states, sampled_states; // vector of (x,y) coordinates for each agent
-    std::vector<bool> goal_reached; // Track if each agent has reached its goal
-    std::map<amp::Node, amp::Node> parent_map; // Store parent nodes for meta agent
-    std::map<amp::Node, std::vector<Eigen::Vector2d>> nodes; // Store nodes for meta agent
+    // Create a graph to store the nodes for each agent
+    std::vector<std::map<amp::Node, Eigen::Vector2d>> nodes(num_agents);
+    std::vector<std::map<amp::Node, amp::Node>> parent_map(num_agents);
+    std::vector<Eigen::Vector2d> sampled_points(num_agents);
+    std::vector<Eigen::Vector2d> current_states(num_agents);
+    std::vector<Eigen::Vector2d> new_state(num_agents);
 
-    // Define the iniital states and goal states for each agent
-    for (const auto& agent : problem.agent_properties) {
-        initial_states.push_back(agent.q_init);
-        current_states.push_back(agent.q_init);
-        sampled_states.push_back(agent.q_init);
-        goal_states.push_back(agent.q_goal);
-        goal_reached.push_back(false); // Initialize goal_reached for each agent
-        path.agent_paths.push_back(amp::Path2D());
+    // Initialize the nodes and parent map for each agent
+    for (int i = 0; i < num_agents; i++) {
+        current_states[i] = problem.agent_properties[i].q_init; // Initialize the current state
+        nodes[i][0] = current_states[i]; // Initialize the first node with the initial state
+        parent_map[i][0] = -1; // Set the parent of the first node to itself
+        path.agent_paths.push_back(amp::Path2D()); // Initialize the path for each agent
+
+        std::cout << "Agent " << i << " initialized at: " << current_states[i].transpose() << " moving to: " << problem.agent_properties[i].q_goal.transpose() << std::endl;
     }
 
-    // Number of iterations
-    int num_itr = 0, inside_num_itr = 0; 
-    double x_rand, y_rand, radius;
-    bool robot_robot_collision;
-    Eigen::Vector2d sample;
-    amp::Node curr_node;
+    // Intialize a counter for the number of iterations
+    int iterations = 0;
+    amp::Node nearest_node, new_node;
 
-    current_states = initial_states; // Set the current states to the initial states
-    nodes[0] = initial_states; // Add the initial states to the nodes
-    parent_map[0] = -1; // Set the parent of the initial node to -1
+    while(iterations < max_itr) {
+        
+        for (int i = 0; i < num_agents; i++){
 
-    // While the goal is not reached or a number of iterations is not reached
-    while (num_itr < max_itr) {
+            // Skip agents that have already reached their goal
+            if (agents_at_goal[i]) {
+                continue; // Skip to the next agent
+            }
 
-        // For each agent
-        for (int i = 0; i < num_agents; i++) {
+            // Randomly sample with goal bias probability
+            Eigen::Vector2d sample;
+            double rand_num = static_cast<double>(rand()) / RAND_MAX; // Random number between 0 and 1
 
-            // Sample the goal with probability goal_bias
-            double prob = static_cast<double>(rand()) / static_cast<double>(RAND_MAX);
-            if (prob < goal_bias) {
-                sampled_states[i] = goal_states[i]; // Sample the goal state
-
+            if (rand_num < goal_bias) {
+                sample = problem.agent_properties[i].q_goal; // Sample the goal
             } else {
-                // Sample a random point in the workspace
-                while (inside_num_itr < 100) {
-                    robot_robot_collision = false; // Check for robot-robot collision
-                    x_rand = x_min + static_cast<double>(rand()) / (static_cast<double>(RAND_MAX / (x_max - x_min)));
-                    y_rand = y_min + static_cast<double>(rand()) / (static_cast<double>(RAND_MAX / (y_max - y_min)));
-                    sample = Eigen::Vector2d(x_rand, y_rand);
-                    radius = problem.agent_properties[i].radius;
 
-                    // Check if the sample is in collision with any obstacles
-                    if (!robot_in_polygons(sample, radius, problem)) {
+                while(true){
+                    double x = (x_max - x_min) * static_cast<double>(rand()) / RAND_MAX + x_min; // Sample x
+                    double y = (y_max - y_min) * static_cast<double>(rand()) / RAND_MAX + y_min; // Sample y
+                    sample = Eigen::Vector2d(x, y); // Create the sample point
+                
+                    if(!robot_in_polygons(sample, problem.agent_properties[i].radius, problem)){
                         break; // Exit the loop if the sample is valid
                     }
-                    inside_num_itr++;
                 }
-                sampled_states[i] = sample; // Update the current state of the agent
             }
+
+            // Given this sample for this robot, find the closest node in its respective tree
+            nearest_node = find_closest_state_node(nodes[i], sample);
+            Eigen::Vector2d nearest_state = nodes[i][nearest_node];
+
+            // Extend a branch towards the sample point
+            Eigen::Vector2d direction = (sample - nearest_state).normalized(); // Normalize the direction
+            new_state[i] = nearest_state + epsilon * direction; // Create a new state
         }
         
-        // Now we have valid sampled states for the meta agent, connect the sampled states to the closest node in tree
-        amp::Node closest_node = find_closest_node(nodes, sampled_states);
-        std::vector<Eigen::Vector2d> closest_node_state = nodes[closest_node]; // Get the closest node state
-
-        std::vector<Eigen::Vector2d> next_states(num_agents); // Compute next states for each agent
-        for (int i = 0 ; i < num_agents; i++){
-            // Calculate the direction to the sampled state
-            Eigen::Vector2d direction = (sampled_states[i] - closest_node_state[i]).normalized();
-            Eigen::Vector2d next_step = closest_node_state[i] + direction * r;
-
-            if (robot_in_polygons(next_step, problem.agent_properties[i].radius, problem)) {
-                next_states[i] = current_states[i]; // If in collision, stay at the current node
-            } else {
-                next_states[i] = next_step; // If no collisions, update the node
-            }
-        }
-
-        // Try to have all robots move towards the sampled state from closest node
+        std::vector<bool> collision(num_agents, false); // Track collisions for each agent
         for (int i = 0; i < num_agents; i++) {
-            robot_robot_collision = false; // Check for robot-robot collision
-            if (goal_reached[i]) {
-                continue; // Skip to the next agent if the goal is already reached
+
+            if (robot_in_polygons(new_state[i], problem.agent_properties[i].radius, problem)) {
+                collision[i] = true; // No collision with the environment
+                continue;
             }
 
-            // Check for collisions with other robots
             for (int j = 0; j < num_agents; j++) {
-                if(i != j) {
-                    if(will_robots_collide(current_states[i], next_states[i], problem.agent_properties[i].radius, current_states[j], next_states[j], problem.agent_properties[j].radius)) {
-                        robot_robot_collision = true; // Set the collision flag
-                        next_states[i] = current_states[i]; // If in collision, stay at the current node
-                        break; // Skip this step if it is in collision with another robot
+                if (j != i) {
+                    if (will_robots_collide(current_states[i], new_state[i], problem.agent_properties[i].radius, current_states[j], new_state[j], problem.agent_properties[j].radius)) {
+                        collision[i] = true; // Collision detected
+                        break;
                     }
                 }
             }
         }
 
+        // Update the states and nodes for agents that are not in collision
         for (int i = 0; i < num_agents; i++) {
-            if (goal_reached[i]) {
-                current_states[i] = current_states[i];
-            } else{
-                current_states[i] = next_states[i];
+            if (!collision[i]) {
+                current_states[i] = new_state[i];
+            } 
+            // Check if the agent has reached its goal
+            if ((current_states[i] - problem.agent_properties[i].q_goal).norm() < epsilon && agents_at_goal[i] == false) {
+                agents_at_goal[i] = true; // Mark the agent as at goal
+                current_states[i] = problem.agent_properties[i].q_goal; // Set the current state to the goal
+                std::cout << "Agent " << i << " has reached its goal." << std::endl;
             }
+
+            // Add the new state to the tree
+            nearest_node = find_closest_state_node(nodes[i], current_states[i]);
+            new_node = nodes[i].size(); // Create a new node
+            nodes[i][new_node] = current_states[i]; // Add the new state to the tree
+            parent_map[i][new_node] = nearest_node; // Set the parent of the new node            
         }
 
-        
-        // Is ths goal reached for any agnets?
-        bool all_goals_reached = true;
+        // Are agents in collision at the end of this iteration?
         for (int i = 0; i < num_agents; i++) {
-            if(goal_reached[i] ) {
-                continue; // Skip to the next agent if the goal is already reached
-            }
-
-            double distance = (current_states[i] - goal_states[i]).norm();
-            if (distance < epsilon) {
-                std::cout << "Goal reached for agent " << i << " --> Current state: " << current_states[i].transpose() << std::endl;        
-                goal_reached[i] = true; // Mark the goal as reached
-            }
-            else {
-                all_goals_reached = false; // At least one agent has not reached its goal
+            for (int j = i + 1; j < num_agents; j++) {
+                if (robot_in_robot(current_states[i], problem.agent_properties[i].radius, current_states[j], problem.agent_properties[j].radius)) {
+                    std::cout << "Collision detected between agents " << i << " and " << j << std::endl;
+                }
             }
         }
 
-        // Now the current states are valid places to move all robots so store in the tree
-        num_itr++;
-        curr_node = num_itr; // Create a new node index
-        nodes[curr_node] = current_states; // Add the new node to the graph
-        parent_map[curr_node] = closest_node; // Store the parent of the new node
+        if (std::all_of(agents_at_goal.begin(), agents_at_goal.end(), [](bool at_goal) { return at_goal; })) {
+            std::cout << "All agents have reached their goal." << std::endl;
 
-        std::cout << "Adding Node " << curr_node << " with states: ";
-        for (const auto& state : current_states) {
-            std::cout << state.transpose() << " | ";
-        }
-
-        std::cout << " that is connected to Node " << closest_node << " with states: ";
-        for (const auto& state : nodes[closest_node]) {
-            std::cout << state.transpose() << " | ";
-        }
-
-        std::cout << std::endl;
-
-        if (all_goals_reached) {
-            std::cout << "All goals reached!" << std::endl;
-            amp::Node new_node = num_itr+1; // Create a new node index
             for (int i = 0; i < num_agents; i++) {
-                current_states[i] = goal_states[i]; // Set the current state to the goal state
+                nearest_node = find_closest_state_node(nodes[i], problem.agent_properties[i].q_goal);
+                new_node = nodes[i].size(); // Create a new node
+                nodes[i][new_node] = problem.agent_properties[i].q_goal; // Add the goal state to the tree
+                parent_map[i][new_node] = nearest_node; // Set the parent of the new node
             }
-            nodes[new_node] = current_states; // Add the new node to the graph
-            parent_map[new_node] = curr_node; // Store the parent of the new node
-            curr_node = new_node; // Update the current node
-            break;
-        }
 
+            break; // Exit if all agents have reached their goal
+        }
+        
+        iterations++;
     }
 
-
-    std::cout << "Number of iterations: " << num_itr << std::endl;
-    for (amp::Node j = curr_node; j != -1; j = parent_map[j]) {
-        // Reconstruct the path for each agent
-        for (int i = 0; i < num_agents; i++) {
-            path.agent_paths[i].waypoints.insert(path.agent_paths[i].waypoints.begin(), nodes[j][i]);          
-        }
-    }
-
+    // Construct the path for each agent using same nodes because they cant be in collision
     for (int i = 0; i < num_agents; i++) {
-        for (int j = 0; j < path.agent_paths[i].waypoints.size(); j++) {
-            std::cout << "Waypoint " << j << ": " << path.agent_paths[i].waypoints[j].transpose() << std::endl;
+        amp::Node current_node = nodes[i].size() - 1; // Start from the last node (goal)
+
+        std::cout << "Agent " << i << " has " << nodes[i].size() << " nodes in its tree." << std::endl;
+        
+        // Backtrack to construct the path
+        while (current_node != -1) {
+            std::cout << current_node << std::endl;
+            path.agent_paths[i].waypoints.insert(path.agent_paths[i].waypoints.begin(), nodes[i][current_node]); // Add the current state to the path
+            current_node = parent_map[i][current_node]; // Move to the parent node
         }
     }
 
-    
-
-    if (num_itr == max_itr) {
-        for (int i = 0; i < num_agents; i++) {
-            path.agent_paths[i].waypoints.push_back(goal_states[i]); // Add the goal state as the last waypoint
+    // Are the agents in collision after reconstruction
+    for (int i = 0; i < num_agents; i++) {
+        for (int j = i + 1; j < num_agents; j++) {
+            for (size_t k = 0; k < path.agent_paths[i].waypoints.size(); k++) {
+                for (size_t l = 0; l < path.agent_paths[j].waypoints.size(); l++) {
+                    if (robot_in_robot(path.agent_paths[i].waypoints[k], problem.agent_properties[i].radius, path.agent_paths[j].waypoints[l], problem.agent_properties[j].radius)) {
+                        std::cout << "Collision detected in the final path between agents " << i << " and " << j << std::endl;
+                    }
+                }
+            }
         }
     }
-   
+
     return path;
 }
 
