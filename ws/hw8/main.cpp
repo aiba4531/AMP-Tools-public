@@ -36,10 +36,9 @@ int main(int argc, char** argv) {
     // Solve using a decentralized approach
     MyDecentralPlanner decentral_planner;
     MultiAgentPath2D path = decentral_planner.plan(problem);
-    collision_states = {{}};
     bool isValid = HW8::check(path, problem, collision_states);
-    //HW8::generateAndCheck(decentral_planner, path, problem, collision_states);
     Visualizer::makeFigure(problem, path, collision_states);
+    //HW8::generateAndCheck(decentral_planner, path, problem, collision_states);
 
     //Visualize and grade methods
     Visualizer::showFigures();

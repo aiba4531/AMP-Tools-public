@@ -287,8 +287,12 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
             itr++;
         }
 
-        std::cout << "No more iterations for agent " << i;";
+        if (itr >= max_itr) {
+            std::cout << "No more iterations for agent " << i << std::endl;
+        }
     }
+
+    std::cout << "Finished planning for all agents!" << std::endl;
 
     return path;
 }
