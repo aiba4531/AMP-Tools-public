@@ -170,8 +170,6 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
 
     // Number of agents    
     int num_agents = problem.numAgents(); 
-    int itr = 0;
-
 
     // Get the bounds of the workspace
     double x_max = problem.x_max;
@@ -184,12 +182,15 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
     std::vector<std::map<amp::Node, amp::Node>> parent_map(num_agents);
     std::vector<amp::Node> current_node(num_agents);
 
-    std::cout << "Number of agents: " << num_agents << std::endl;
-
     // Create a vector for initial states, goal states, current states, next states, and current samples
     Eigen::Vector2d initial_state, goal_state, current_state, next_state, sample; // Each agent has a x and y state
-
+    int stop = 0;
     for (int i = 0; i < num_agents; i++) {
+
+        if(stop == num_agents){
+            break;
+        }
+        stop++;
 
         initial_state = problem.agent_properties[i].q_init;
         goal_state = problem.agent_properties[i].q_goal;
@@ -198,7 +199,7 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
         // Let the current state be the initial state
         current_state = initial_state;
 
-        std::cout << "Agent " << i << " Initial State: " << current_state.transpose() << std::endl;
+        std::cout << "Planning for agent " << i << " with initial state: " << current_state.transpose() << " and goal state: " << goal_state.transpose() << std::endl;
 
         // Define the first node to have initial state and parent of -1
         nodes[i][0] = current_state;
@@ -222,14 +223,30 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
                 break; // Exit if the current state is in the goal
             }
 
-
             // Generate a random number to decide if sample the goal
             double rand_num = static_cast<double>(rand()) / RAND_MAX;
 
             // If the rand_num < goal bias, sample the goal
             if (rand_num < goal_bias) {
                 sample = goal_state;
-            } else {
+            }
+            else if (rand_num > goal_bias && rand_num < 0.1) {
+                // Sample a left corner
+                sample = Eigen::Vector2d(x_min, y_min);
+            }
+            else if(rand_num > 0.1 && rand_num < 0.2){
+                // Sample a right corner
+                sample = Eigen::Vector2d(x_max, y_min);
+            }
+            else if(rand_num > 0.2 && rand_num < 0.3){
+                // Sample a top left corner
+                sample = Eigen::Vector2d(x_min, y_max);
+            }
+            else if(rand_num > 0.3 && rand_num < 0.4){
+                // Sample a top right corner
+                sample = Eigen::Vector2d(x_max, y_max);
+            }
+            else {
                 while(true){
                     // Sample a random state in the workspace
                     double x_sample = x_min + static_cast<double>(rand()) / (static_cast<double>(RAND_MAX/(x_max - x_min)));
@@ -242,7 +259,7 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
                     }
                 }
             }
-            
+
             amp::Node nearest_node = find_closest_state_node(nodes[i], sample);
             Eigen::Vector2d nearest_state = nodes[i][nearest_node];
 
@@ -260,14 +277,23 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
 
             // Check for collisions with other agents
             bool valid_next_state = true;
-            for (int j = 0; j < i; j++) {
-                if (i =! j) {
-                    // Check along the entire path for collisions
-                    for (int k = 0; k < path.agent_paths[j].waypoints.size(); k++) {
-                        if (will_robots_collide(current_state, next_state, problem.agent_properties[i].radius,
-                                                path.agent_paths[j].waypoints[k], path.agent_paths[j].waypoints[k], problem.agent_properties[j].radius)) {
-                            valid_next_state = false;
-                            break;
+            for (int j = 0; j < num_agents; j++) {
+                if (i != j) {
+                    // Check if the next state is in collision with other robot start or goal
+                    if (robot_in_robot(next_state, problem.agent_properties[i].radius, problem.agent_properties[j].q_init, problem.agent_properties[j].radius) ||
+                        robot_in_robot(next_state, problem.agent_properties[i].radius, problem.agent_properties[j].q_goal, problem.agent_properties[j].radius)) {
+                        valid_next_state = false;
+                        break;
+                    }
+
+                    if (j < i) {
+                        // Check along the entire path for collisions
+                        for (int k = 0; k < path.agent_paths[j].waypoints.size(); k++) {
+                            if (will_robots_collide(current_state, next_state, problem.agent_properties[i].radius,
+                                                    path.agent_paths[j].waypoints[k], path.agent_paths[j].waypoints[k], problem.agent_properties[j].radius)) {
+                                valid_next_state = false;
+                                break;
+                            }
                         }
                     }
                 }
@@ -278,8 +304,10 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
             }
             // If the next state is NOT valid then skip to the next iteration
             if (!valid_next_state) {
+                itr++;
                 continue;
             }
+
             current_node[i] = nodes[i].size(); // Start from the last node
             current_state = next_state; // Update the current state
             nodes[i][current_node[i]] = current_state; // Add the new state to the graph
@@ -287,8 +315,13 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
             itr++;
         }
 
-        if (itr >= max_itr) {
-            std::cout << "No more iterations for agent " << i << std::endl;
+        if (itr == max_itr) {
+            std::cout << "Agent " << i << " FAILED to reach goal after " << max_itr << " iterations." << std::endl;
+            path.agent_paths[i].waypoints.push_back(initial_state); 
+            path.agent_paths[i].waypoints.push_back(goal_state);
+            break;
+        } else {
+            std::cout << "Agent " << i << " completed planning in " << itr << " iterations." << std::endl; 
         }
     }
 
