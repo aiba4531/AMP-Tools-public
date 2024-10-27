@@ -24,19 +24,20 @@ int main(int argc, char** argv) {
 
     // Initialize Workspace 1 with 3 agents
     amp::RNG::seed(amp::RNG::randiUnbounded());
-    MultiAgentProblem2D problem = HW8::getWorkspace1(4);
+    MultiAgentProblem2D problem = HW8::getWorkspace1(2);
     std::vector<std::vector<Eigen::Vector2d>> collision_states;
 
     // Solve using a centralized approach
-    MyCentralPlanner central_planner;
-    MultiAgentPath2D path = central_planner.plan(problem);
-    bool isValid = HW8::check(path, problem, collision_states);
-    Visualizer::makeFigure(problem, path, collision_states);
+    // MyCentralPlanner central_planner;
+    // MultiAgentPath2D path = central_planner.plan(problem);
+    // bool isValid = HW8::check(path, problem, collision_states);
+    // Visualizer::makeFigure(problem, path, collision_states);
 
     // Solve using a decentralized approach
     MyDecentralPlanner decentral_planner;
-    // collision_states = {{}};
+    //collision_states = {{}};
     MultiAgentPath2D path2 = decentral_planner.plan(problem);
+    bool isValid2 = HW8::check(path2, problem, collision_states);
     Visualizer::makeFigure(problem, path2, collision_states);
     //HW8::generateAndCheck(decentral_planner, path, problem, collision_states);
 

@@ -181,19 +181,12 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
     // Create a vector of graphs that have the paths for all nodes
     std::vector<std::map<amp::Node, Eigen::Vector2d>> nodes(num_agents);
     std::vector<std::map<amp::Node, amp::Node>> parent_map(num_agents);
+    std::vector<std::map<amp::Node, int>> time_map(num_agents); // Store the time for each node
     std::vector<amp::Node> current_node(num_agents);
 
     // Create a vector for initial states, goal states, current states, next states, and current samples
     Eigen::Vector2d initial_state, goal_state, current_state, next_state, sample; // Each agent has a x and y state
     int stop = 0;
-
-    // Priotize agents: Agent 4 3 2 1
-    std::vector<Eigen::Vector2d> priorities_initial_states;
-    std::vector<Eigen::Vector2d> priorities_goal_states;
-    for (int i = num_agents - 1; i >= 0; i--) {
-        priorities_initial_states.push_back(problem.agent_properties[i].q_init);
-        priorities_goal_states.push_back(problem.agent_properties[i].q_goal);
-    }
 
     for (int i = 0; i < num_agents; i++){
         path.agent_paths.push_back(amp::Path2D());
@@ -209,8 +202,6 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
 
         initial_state = problem.agent_properties[i].q_init;
         goal_state = problem.agent_properties[i].q_goal;
-        // initial_state = priorities_initial_states[i];
-        // goal_state = priorities_goal_states[i];
 
         // Let the current state be the initial state
         current_state = initial_state;
@@ -218,10 +209,11 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
         // Define the first node to have initial state and parent of -1
         nodes[i][0] = current_state;
         parent_map[i][0] = -1;
-
+        time_map[i][0] = 0; // Initialize time for the first node
         current_node[i] = 1; // Set the current node for each agent
 
         // RRT algorithm for each agent
+        int time_index = 0;
         int itr = 0;
         while (itr < max_itr) {
 
@@ -291,6 +283,7 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
 
             amp::Node nearest_node = find_closest_state_node(nodes[i], sample);
             Eigen::Vector2d nearest_state = nodes[i][nearest_node];
+            int current_time = time_map[i][nearest_node] + 1; // Increment time for the current node
 
             // Calculate the direction to the sample and normalize it
             Eigen::Vector2d direction = sample - nearest_state;
@@ -314,26 +307,26 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
                         valid_next_state = false;
                         break;
                     }
-                    // if (robot_in_robot(next_state, problem.agent_properties[i].radius, priorities_initial_states[j], problem.agent_properties[j].radius) ||
-                    //     robot_in_robot(next_state, problem.agent_properties[i].radius, priorities_goal_states[j], problem.agent_properties[j].radius)) {
-                    //     valid_next_state = false;
-                    //     break;
-                    // }
-
+    
                     if (j < i) {
-                        // Check along the entire path for collisions
-                        for (int k = 0; k < path.agent_paths[j].waypoints.size(); k++) {
-                            if (will_robots_collide(current_state, next_state, problem.agent_properties[i].radius,
-                                                    path.agent_paths[j].waypoints[k], path.agent_paths[j].waypoints[k], problem.agent_properties[j].radius)) {
+                        
+                        if (will_robots_collide(current_state, next_state, problem.agent_properties[i].radius,
+                                                path.agent_paths[j].waypoints[current_time], path.agent_paths[j].waypoints[current_time], problem.agent_properties[j].radius)) {
+                                                  
+                        // // Check along the entire path for collisions
+                        // for (int k = 0; k < path.agent_paths[j].waypoints.size(); k++) {
+                        //     if (will_robots_collide(current_state, next_state, problem.agent_properties[i].radius,
+                        //                             path.agent_paths[j].waypoints[k], path.agent_paths[j].waypoints[k], problem.agent_properties[j].radius)) {
+
+                                std::cout << "Collision detected between agent " << i << " and agent " << j << " at time " << current_time << std::endl;                            
                                 valid_next_state = false;
                                 break;
                             }
                         }
-                    }
-                }
 
-                if (!valid_next_state) {
-                    break;
+                    if (!valid_next_state) {
+                        break;
+                    }
                 }
             }
             // If the next state is NOT valid then skip to the next iteration
@@ -342,10 +335,21 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
                 continue;
             }
 
+            // Access the last node to add the new state
             current_node[i] = nodes[i].size(); // Start from the last node
+
+            // Update the current state
             current_state = next_state; // Update the current state
-            nodes[i][current_node[i]] = current_state; // Add the new state to the graph
+
+            // Add the new state to the graph for agent i at the current node
+            nodes[i][current_node[i]] = current_state;
+
+            // Set the parent of the new node
             parent_map[i][current_node[i]] = nearest_node; // Set the parent of the new node
+            
+            // This would occur directly after parent node if chosen so add 1 to time
+            time_index = time_map[i][nearest_node] + 1; 
+            time_map[i][current_node[i]] = time_index; 
             itr++;
         }
 
