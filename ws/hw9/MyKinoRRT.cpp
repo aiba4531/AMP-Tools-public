@@ -8,6 +8,27 @@ void MySingleIntegrator::propagate(Eigen::VectorXd& state, Eigen::VectorXd& cont
     state += dt * control;
 };
 
+void MyFirstOrderUnicycle::propagate(Eigen::VectorXd& state, Eigen::VectorXd& control, double dt) {
+    state[0] += dt * control[0] * std::cos(state[2]);
+    state[1] += dt * control[0] * std::sin(state[2]);
+    state[2] += dt * control[1];
+};
+
+// amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::DynamicAgent& agent) {
+//     amp::KinoPath path;
+//     Eigen::VectorXd state = problem.q_init;
+//     path.waypoints.push_back(state);
+//     for (int i = 0; i < 10; i++) {
+//         Eigen::VectorXd control = Eigen::VectorXd::Random(problem.q_init.size());
+//         agent.propagate(state, control, 1.0);
+//         path.waypoints.push_back(state);
+//         path.controls.push_back(control);
+//         path.durations.push_back(1.0);
+//     }
+//     path.valid = true;
+//     return path;
+// }
+
 amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::DynamicAgent& agent) {
     amp::KinoPath path;
 
@@ -141,7 +162,7 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
         new_node = potential_states.size();
         potential_states[new_node] = best_state;
         potential_controls[nearest_node] = best_control;
-        potential_duration[new_node] = potential_duration[nearest_node] + dt;
+        potential_duration[new_node] = dt;
         parent_map[new_node] = nearest_node;
         current_itr++;
 
@@ -166,20 +187,11 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
 
             potential_states[new_node] = final_state;
             potential_controls[prev_node] = goal_control;
-            potential_duration[new_node] = potential_duration[prev_node] + dt;
+            potential_duration[new_node] = dt;
             parent_map[new_node] = prev_node;
             potential_controls[new_node] = Eigen::VectorXd::Zero(num_control_inputs);
 
             std::cout << "GOAL! At iteration " << current_itr << " the final state is: " << final_state[0] << ", " << final_state[1] << " with control: " << goal_control[0] << ", " << goal_control[1] << std::endl;
-            
-            // Add the goal state with zero control to the tree
-            // new_node = potential_states.size();
-            // potential_states[new_node] = goal_state;
-            // potential_controls[new_node] = Eigen::VectorXd::Zero(num_control_inputs);
-            // potential_duration[new_node] = potential_duration[new_node - 1] + dt;
-            // parent_map[new_node] = new_node - 1;
-
-
             break;
         }
 
@@ -192,10 +204,6 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
         path.waypoints.push_back(potential_states[current_node]);
         path.controls.push_back(potential_controls[current_node]);
         path.durations.push_back(potential_duration[current_node]);
-
-        // std::cout << "Node " << current_node << " at " << potential_states[current_node][0] << ", " << potential_states[current_node][1]
-        //         << " with control: " << potential_controls[current_node][0] << ", " << potential_controls[current_node][1] << std::endl;
-
         current_node = parent_map[current_node];
     }
 
@@ -220,19 +228,6 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
 
 
     path.valid = true;
-
-
-
-
-
-    // for (int i = 0; i < 10; i++) {
-    //     Eigen::VectorXd control = Eigen::VectorXd::Random(problem.q_init.size());
-    //     agent.propagate(state, control, 1.0);
-    //     path.waypoints.push_back(state);
-    //     path.controls.push_back(control);
-    //     path.durations.push_back(1.0);
-    // }
-    //path.valid = true;
     return path;
 }
 
