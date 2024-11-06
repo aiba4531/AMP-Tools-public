@@ -27,8 +27,8 @@ void MySecondOrderUnicycle::propagate(Eigen::VectorXd& state, Eigen::VectorXd& c
     // Control is [a, alpha]
     const double r = 0.25;
 
-    state[0] += dt * state[3] * std::cos(state[2]);
-    state[1] += dt * state[3] * std::sin(state[2]);
+    state[0] += dt * state[3] * r * std::cos(state[2]);
+    state[1] += dt * state[3] * r * std::sin(state[2]);
     state[2] += dt * state[4];
     state[3] += dt * control[0];
     state[4] += dt * control[1];
@@ -136,7 +136,7 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
         // Create a vector to store the potential random controls
         Eigen::VectorXd control = Eigen::VectorXd::Zero(num_control_inputs);
         int num_sampled_controls = 0;
-        while (num_sampled_controls < 100){
+        while (num_sampled_controls < 15){
             // Sample a random control
             for (int i = 0; i < num_control_inputs; i++){
                 control[i] = control_space[i].first + static_cast <double> (rand()) / (static_cast <double> (RAND_MAX/(control_space[i].second - control_space[i].first))); 
