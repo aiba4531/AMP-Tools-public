@@ -42,6 +42,8 @@ class MyFirstOrderUnicycle : public amp::DynamicAgent {
 class MySecondOrderUnicycle : public amp::DynamicAgent {
     public:
         virtual void propagate(Eigen::VectorXd& state, Eigen::VectorXd& control, double dt) override;
+        Eigen::VectorXd state_derivative(const Eigen::VectorXd& state, const Eigen::VectorXd& control, double r);
+
 };
 
 class MySimpleCar : public amp::DynamicAgent {
