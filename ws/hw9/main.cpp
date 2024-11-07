@@ -17,12 +17,12 @@ std::unordered_map<AgentType, std::function<std::shared_ptr<amp::DynamicAgent>()
 
 int main(int argc, char** argv) {
     // Select problem, plan, check, and visualize
-    int select = 2;
+    int select = 5;
     KinodynamicProblem2D prob = problems[select];
     
     // Create a planner and plan
     double goal_bias = 0.05;
-    double max_itr = 50000;
+    double max_itr = 200000;
     double dt = 0.5;
     
     MyKinoRRT kino_planner(goal_bias, max_itr, dt);

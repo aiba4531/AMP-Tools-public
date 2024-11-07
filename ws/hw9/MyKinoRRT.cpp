@@ -3,6 +3,7 @@ bool point_in_polygons(const Eigen::Vector2d& point, const amp::KinodynamicProbl
 amp::Node find_closest_node(const std::map<amp::Node, Eigen::VectorXd> &nodes, const Eigen::VectorXd &samples);
 std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> get_all_primitives(const amp::KinodynamicProblem2D& problem);
 bool line_segment_in_polygon(const std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives, const std::tuple<Eigen::Vector2d, Eigen::Vector2d> next_step);
+bool line_segment_in_polygon1(const std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives, const std::tuple<Eigen::Vector2d, Eigen::Vector2d> next_step);
 void propagate_agent(const amp::KinodynamicProblem2D& problem, Eigen::VectorXd& state, Eigen::VectorXd& control, double dt);
 bool line_segment_with_rotation_in_polygon(const std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives, const Eigen::VectorXd& robot_center_position, double robot_angle);
 bool next_step_or_control_out_of_bounds(const Eigen::Vector2d& next_step, Eigen::VectorXd& control ,const amp::KinodynamicProblem2D& problem);
@@ -108,7 +109,8 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
         else {
             // Sample a valid ranodm state in the workspace
             int num_sampled_points = 0;
-            while(num_sampled_points < 1000){
+            int max_sampled_points = 1000;
+            while(num_sampled_points < max_sampled_points){
                 // Sample a random state
                 for (int i = 0; i < num_states; i++){
                     sample[i] = state_space_bounds[i].first + static_cast <double> (rand()) / (static_cast <double> (RAND_MAX/(state_space_bounds[i].second - state_space_bounds[i].first))); 
@@ -132,11 +134,14 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
         // Create a vector to store the potential states from the random controls
         std::vector<Eigen::VectorXd> random_potential_states;
         std::vector<Eigen::VectorXd> random_potential_controls;
+        Eigen::Vector2d new_robot_position, previous_robot_position;
+        double new_robot_angle, previous_robot_angle;
 
         // Create a vector to store the potential random controls
         Eigen::VectorXd control = Eigen::VectorXd::Zero(num_control_inputs);
         int num_sampled_controls = 0;
-        while (num_sampled_controls < 15){
+        int max_sampled_controls = 15;
+        while (num_sampled_controls < max_sampled_controls){
             // Sample a random control
             for (int i = 0; i < num_control_inputs; i++){
                 control[i] = control_space[i].first + static_cast <double> (rand()) / (static_cast <double> (RAND_MAX/(control_space[i].second - control_space[i].first))); 
@@ -147,9 +152,9 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
             propagate_agent(problem, new_state, control, dt);
 
             // Check if the new state is valid
-            Eigen::Vector2d new_robot_position = new_state.segment<2>(0);
-            Eigen::Vector2d previous_robot_position = nearest_state.segment<2>(0);
-            Eigen::Vector2d robot_angles = Eigen::Vector2d(nearest_state[2], new_state[2]);
+            new_robot_position = new_state.segment<2>(0);
+            new_robot_angle = new_state[2];
+            previous_robot_position = nearest_state.segment<2>(0);
 
             // If center of robot is in the polygon, find a new control
             if (point_in_polygons(new_robot_position, problem)){
@@ -174,7 +179,7 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
             }
             else { // The robot is a car agent
                 // Check if the line segments that define the new car position are in collision with the obstacles
-                if (line_segment_with_rotation_in_polygon(all_primitives, new_robot_position, robot_angles[1])){
+                if (line_segment_with_rotation_in_polygon(all_primitives, new_robot_position, new_robot_angle)){
                     num_sampled_controls++;
                     continue;
                 }
@@ -196,7 +201,11 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
                 //double distance = (random_potential_states[i].segment<2>(0) - sample.segment<2>(0)).norm();
                 
                 // Grab the n-Dim distance
-                double distance = (random_potential_states[i] - sample).norm();
+                //double distance = (random_potential_states[i] - sample).norm();
+                
+                // Grab the distance that minimizes the angle? IDK what this does
+                double distance = (random_potential_states[i].segment<2>(0) - sample.segment<2>(0)).squaredNorm() + std::abs(random_potential_states[i][2] - sample[2]);
+                
                 if (distance < min_distance){
                     min_distance = distance;
                     best_state = random_potential_states[i];
@@ -222,10 +231,15 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
             }
 
             if (goal_reached){ // flag was never set to false, so inside goal region
+                amp::Node previous_node = new_node;
+                new_node = potential_states.size();
+                potential_controls[new_node] = Eigen::VectorXd::Zero(num_control_inputs);
+                potential_duration[new_node] = dt;
+                parent_map[new_node] = previous_node;
                 break;
             }
         }
-        else { // No valid states were found try to sample a new point
+        else { // No valid states were found try to sample a new point          
             current_itr++;
         }
         //std::cout << "Current Iteration: " << current_itr << std::endl;
@@ -237,10 +251,9 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
     }
 
     // Construct the path
-    std::cout << "Reconstructing path ..." << std::endl;
+    std::cout << "After " << current_itr << " iterations, received a valid path!" << std::endl;
     amp::Node current_node = new_node;
-    while (current_node != -1){
-        path.waypoints.push_back(potential_states[current_node]);
+    while (current_node != 0){
         path.controls.push_back(potential_controls[current_node]);
         path.durations.push_back(potential_duration[current_node]);
         current_node = parent_map[current_node];
@@ -255,14 +268,19 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
     Eigen::VectorXd current_state = problem.q_init;
     for (int i = 0; i < path.controls.size(); i++){
         propagate_agent(problem, current_state, path.controls[i], path.durations[i]);
+        path.waypoints.push_back(current_state);
         std::cout << "Waypoint " << i + 1 << ": State = ";
         std::cout << std::fixed << std::setprecision(2);
         for (int j = 0; j < current_state.size(); j++){
             std::cout << " " << current_state[j];
         }
-        std::cout << " Control = ";
+        std::cout << " Control over Timestep = ";
         for (int j = 0; j < path.controls[i].size(); j++){
             std::cout << " " << path.controls[i][j] * path.durations[i];
+
+            if (path.controls[i][j] < problem.u_bounds[j].first || path.controls[i][j]  > problem.u_bounds[j].second){
+                std::cout << " Control out of bounds!";
+            }
         }
         std::cout << std::endl;
     }
@@ -293,8 +311,70 @@ void propagate_agent(const amp::KinodynamicProblem2D& problem, Eigen::VectorXd& 
 }
 
 
+bool line_segment_with_rotation_in_polygon(const std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives, const Eigen::VectorXd& robot_center_position, double robot_angle) {
+    const double half_width = 1;    // Half of the robot's width
+    const double half_length = 2.5; // Half of the robot's length
+
+    // Define the four corners of the rectangle in the robot's local frame
+    std::array<Eigen::Vector2d, 4> corners_local = {
+        Eigen::Vector2d(half_length, half_width),
+        Eigen::Vector2d(-half_length, half_width),
+        Eigen::Vector2d(-half_length, -half_width),
+        Eigen::Vector2d(half_length, -half_width)
+    };
+
+    // Rotate corners into the global frame and create line segments for each side
+    std::vector<std::pair<Eigen::Vector2d, Eigen::Vector2d>> car_segments;
+    for (int i = 0; i < 4; ++i) {
+        Eigen::Vector2d corner1 = corners_local[i];
+        Eigen::Vector2d corner2 = corners_local[(i + 1) % 4];
+
+        // Rotate and translate corners into the global frame
+        Eigen::Vector2d point1(
+            std::cos(robot_angle) * corner1.x() - std::sin(robot_angle) * corner1.y() + robot_center_position.x(),
+            std::sin(robot_angle) * corner1.x() + std::cos(robot_angle) * corner1.y() + robot_center_position.y()
+        );
+        Eigen::Vector2d point2(
+            std::cos(robot_angle) * corner2.x() - std::sin(robot_angle) * corner2.y() + robot_center_position.x(),
+            std::sin(robot_angle) * corner2.x() + std::cos(robot_angle) * corner2.y() + robot_center_position.y()
+        );
+
+        car_segments.push_back({point1, point2});
+    }
+
+    // Check each car segment against all obstacle primitives
+    for (const auto& car_segment : car_segments) {
+        Eigen::Vector2d car_start = car_segment.first;
+        Eigen::Vector2d car_end = car_segment.second;
+
+        for (const auto& obstacle_primitives : all_primitives) {
+            for (const auto& primitive : obstacle_primitives) {
+                Eigen::Vector2d obs_start = std::get<0>(primitive);
+                Eigen::Vector2d obs_end = obs_start + std::get<1>(primitive);
+
+                Eigen::Vector2d r = car_end - car_start;
+                Eigen::Vector2d s = obs_end - obs_start;
+                Eigen::Vector2d diff = obs_start - car_start;
+
+                double det = r.x() * s.y() - r.y() * s.x();
+                if (std::abs(det) < 1e-6) continue; // Parallel segments
+
+                double t = (diff.x() * s.y() - diff.y() * s.x()) / det;
+                double u = (diff.x() * r.y() - diff.y() * r.x()) / det;
+
+                // Check if intersection point lies within both segments
+                if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+                    return true; // Collision detected
+                }
+            }
+        }
+    }
+    return false; // No collision detected
+}
+
+
 // Line segment with angle polygon intersection algorithm
-bool line_segment_with_rotation_in_polygon(const std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives, const Eigen::VectorXd& robot_center_position, double robot_angle){
+bool line_segment_with_rotation_in_polygon1(const std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives, const Eigen::VectorXd& robot_center_position, double robot_angle){
     // For all four line segments that define the rectangular moving from one spot to another
 
     // Check if any of the four segments that make up car collide with any of the obstacles
@@ -372,6 +452,7 @@ bool line_segment_with_rotation_in_polygon(const std::vector<std::vector<std::tu
 }
 
 
+// Check if the next step or control is out of bounds
 bool next_step_or_control_out_of_bounds(const Eigen::Vector2d& next_step, Eigen::VectorXd& control ,const amp::KinodynamicProblem2D& problem) {
     // Check if the next step is out of bounds
     if (next_step.x() < problem.q_bounds[0].first || next_step.x() > problem.q_bounds[0].second || next_step.y() < problem.q_bounds[1].first || next_step.y() > problem.q_bounds[1].second) {
@@ -423,24 +504,56 @@ bool line_segment_in_polygon(const std::vector<std::vector<std::tuple<Eigen::Vec
 }
 
 
-// Define all linear primitives for each obstacle
+// // Define all linear primitives for each obstacle
+// std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> get_all_primitives(const amp::KinodynamicProblem2D& problem) {
+//     std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives;
+//     for (int i = 0; i < problem.obstacles.size(); i++) {
+//         std::vector<Eigen::Vector2d> verticies = problem.obstacles[i].verticesCW();
+//         std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>> primitives;
+        
+//         for (int j = 0; j < verticies.size(); j++) {
+//             if (j == verticies.size() - 1) {
+//                 primitives.push_back(std::make_tuple(verticies[j], verticies[0]-verticies[j]));
+//                 continue;
+//             }
+//             primitives.push_back(std::make_tuple(verticies[j], verticies[j+1]-verticies[j]));
+//         }
+//         all_primitives.push_back(primitives);
+//     }
+//     return all_primitives;
+// }
+
 std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> get_all_primitives(const amp::KinodynamicProblem2D& problem) {
     std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives;
-    for (int i = 0; i < problem.obstacles.size(); i++) {
-        std::vector<Eigen::Vector2d> verticies = problem.obstacles[i].verticesCW();
-        std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>> primitives;
-        
-        for (int j = 0; j < verticies.size(); j++) {
-            if (j == verticies.size() - 1) {
-                primitives.push_back(std::make_tuple(verticies[j], verticies[0]-verticies[j]));
-                continue;
-            }
-            primitives.push_back(std::make_tuple(verticies[j], verticies[j+1]-verticies[j]));
+    double expansion_factor = 0.025;
+    for (const auto& obstacle : problem.obstacles) {
+        std::vector<Eigen::Vector2d> vertices = obstacle.verticesCW();
+        Eigen::Vector2d centroid = Eigen::Vector2d::Zero();
+
+        // Calculate the centroid
+        for (const auto& vertex : vertices) {
+            centroid += vertex;
         }
+        centroid /= vertices.size();
+
+        // Expand each vertex outward from the centroid
+        for (auto& vertex : vertices) {
+            Eigen::Vector2d direction = vertex - centroid;
+            vertex += direction * expansion_factor;
+        }
+
+        std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>> primitives;
+        for (size_t j = 0; j < vertices.size(); ++j) {
+            Eigen::Vector2d start = vertices[j];
+            Eigen::Vector2d end = (j == vertices.size() - 1) ? vertices[0] : vertices[j + 1];
+            primitives.push_back(std::make_tuple(start, end - start));
+        }
+
         all_primitives.push_back(primitives);
     }
     return all_primitives;
 }
+
 
 
 // Finds the closest node to the sampled state
@@ -461,7 +574,7 @@ amp::Node find_closest_node(const std::map<amp::Node, Eigen::VectorXd> &nodes, c
 
 // Checking if a point is inside a polygon
 bool point_in_polygons(const Eigen::Vector2d& point, const amp::KinodynamicProblem2D& problem) {   
-    constexpr double epsilon = 1e-9; // Small tolerance for floating-point errors
+    constexpr double epsilon = 0;//1e-9; // Small tolerance for floating-point errors
 
     // For every obstacle in the problem
     for (const auto& obstacle : problem.obstacles) {
