@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
     HW9::check(path, prob);
     
     if (path.valid)
-        Visualizer::makeFigure(prob, path, true); // Set to 'true' to render animation
+        Visualizer::makeFigure(prob, path, false); // Set to 'true' to render animation
     Visualizer::showFigures();
     //HW9::grade<MyKinoRRT, MySingleIntegrator, MyFirstOrderUnicycle, MySecondOrderUnicycle, MySimpleCar>("firstName.lastName@colorado.edu", argc, argv, std::make_tuple(), std::make_tuple(), std::make_tuple(), std::make_tuple(), std::make_tuple());
     return 0;

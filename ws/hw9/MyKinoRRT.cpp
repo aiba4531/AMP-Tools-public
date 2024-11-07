@@ -35,16 +35,24 @@ void MySecondOrderUnicycle::propagate(Eigen::VectorXd& state, Eigen::VectorXd& c
     int num_steps = 50;
     double new_dt = dt / num_steps;
 
-    for (int i = 0; i < num_steps; i++) {
-        // Store initial state
-        Eigen::VectorXd k1 = state_derivative(state, control, r);
-        Eigen::VectorXd k2 = state_derivative(state + 0.5 * new_dt * k1, control, r);
-        Eigen::VectorXd k3 = state_derivative(state + 0.5 * new_dt * k2, control, r);
-        Eigen::VectorXd k4 = state_derivative(state + new_dt * k3, control, r);
+    // Eigen::VectorXd state_derivative(5);
+    Eigen::VectorXd K1 = state_derivative(state, control, r);
+    Eigen::VectorXd K2 = state_derivative(state + 0.5 * dt * K1, control, r);
+    Eigen::VectorXd K3 = state_derivative(state + 0.5 * dt * K2, control, r);
+    Eigen::VectorXd K4 = state_derivative(state + dt * K3, control, r);
 
-        // Update the state using weighted sum of derivatives
-        state += (new_dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4);
-    }
+    state += (dt / 6.0) * (K1 + 2 * K2 + 2 * K3 + K4);
+
+    // for (int i = 0; i < num_steps; i++) {
+    //     // Store initial state
+    //     Eigen::VectorXd k1 = state_derivative(state, control, r);
+    //     Eigen::VectorXd k2 = state_derivative(state + 0.5 * new_dt * k1, control, r);
+    //     Eigen::VectorXd k3 = state_derivative(state + 0.5 * new_dt * k2, control, r);
+    //     Eigen::VectorXd k4 = state_derivative(state + new_dt * k3, control, r);
+
+    //     // Update the state using weighted sum of derivatives
+    //     state += (new_dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4);
+    // }
 }
 
 // Helper function to compute the derivative of the state given the current state and control
