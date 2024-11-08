@@ -48,5 +48,7 @@ class MySecondOrderUnicycle : public amp::DynamicAgent {
 
 class MySimpleCar : public amp::DynamicAgent {
     public:
-        virtual void propagate(Eigen::VectorXd& state, Eigen::VectorXd& control, double dt) override;
+        virtual void propagate(Eigen::VectorXd& state, Eigen::VectorXd& control, double dt) override {};
+        void propagate_car(Eigen::VectorXd& state, Eigen::VectorXd& control, double dt, const amp::KinodynamicProblem2D& problem);
+        double get_length(const amp::KinodynamicProblem2D& problem);
 };

@@ -17,24 +17,24 @@ std::unordered_map<AgentType, std::function<std::shared_ptr<amp::DynamicAgent>()
 
 int main(int argc, char** argv) {
     // Select problem, plan, check, and visualize
-    int select = 4;
+    int select = 7;
     KinodynamicProblem2D prob = problems[select];
     amp::RNG::seed(amp::RNG::randiUnbounded());
 
     // Create a planner and plan
     double goal_bias = 0.05;
-    double max_itr = 750000;
-    double dt = 0.1;
+    double max_itr = 100000;
+    double dt = 0.20;
     
     MyKinoRRT kino_planner(goal_bias, max_itr, dt);
 
     // Plan the path
-    KinoPath path = kino_planner.plan(prob, *agentFactory[prob.agent_type]());
-    HW9::check(path, prob);
-    
-    if (path.valid)
-        Visualizer::makeFigure(prob, path, false); // Set to 'true' to render animation
-    Visualizer::showFigures();
-    //HW9::grade<MyKinoRRT, MySingleIntegrator, MyFirstOrderUnicycle, MySecondOrderUnicycle, MySimpleCar>("firstName.lastName@colorado.edu", argc, argv, std::make_tuple(), std::make_tuple(), std::make_tuple(), std::make_tuple(), std::make_tuple());
+    //KinoPath path = kino_planner.plan(prob, *agentFactory[prob.agent_type]());
+    //HW9::check(path, prob); 
+
+    //if (path.valid)
+    //    Visualizer::makeFigure(prob, path, true); // Set to 'true' to render animation
+    //Visualizer::showFigures();
+    HW9::grade<MyKinoRRT, MySingleIntegrator, MyFirstOrderUnicycle, MySecondOrderUnicycle, MySimpleCar>("aidan.bagley@colorado.edu", argc, argv, std::make_tuple(), std::make_tuple(), std::make_tuple(), std::make_tuple(), std::make_tuple());
     return 0;
 }
