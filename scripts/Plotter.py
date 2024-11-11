@@ -13,13 +13,18 @@ visualize_config = {
 
 def make_bar_graph(values : list, labels : list, title : str, xlabel : str, ylabel : str):
     ax = plt.gca() 
+    fig = plt.gcf()
+    fig.set_size_inches(15, 5)
     ax.bar(labels, values, color=visualize_config["bar_color"])
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    
 
 def make_box_plot(data : list, labels : list, title : str, xlabel : str, ylabel : str):
     ax = plt.gca() 
+    fig = plt.gcf()
+    fig.set_size_inches(15, 5)
     ax.boxplot(data, labels=labels)
     ax.set_title(title)
     ax.set_xlabel(xlabel)

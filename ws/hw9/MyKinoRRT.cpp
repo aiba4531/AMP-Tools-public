@@ -5,8 +5,8 @@ std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> get_all_p
 bool line_segment_in_polygon(const std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives, const std::tuple<Eigen::Vector2d, Eigen::Vector2d> next_step);
 void propagate_agent(const amp::KinodynamicProblem2D& problem, Eigen::VectorXd& state, Eigen::VectorXd& control, double dt);
 bool line_segment_with_rotation_in_polygon(const std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives, const Eigen::VectorXd& rear_axle_center_position, double robot_angle, const amp::KinodynamicProblem2D& problem);
-bool next_step_or_control_out_of_bounds(const Eigen::Vector2d& next_step, Eigen::VectorXd& control ,const amp::KinodynamicProblem2D& problem, double scaling_factor = 1.0);
-bool car_next_step_or_control_out_of_bounds(const Eigen::Vector2d& rear_axle_center_position, double robot_angle, Eigen::VectorXd& control ,const amp::KinodynamicProblem2D& problem, double scaling_factor);
+bool next_step_or_control_out_of_bounds(const Eigen::VectorXd new_state, const Eigen::Vector2d& next_step, Eigen::VectorXd& control ,const amp::KinodynamicProblem2D& problem, double scaling_factor = 1.0);
+bool car_next_step_or_control_out_of_bounds(const Eigen::VectorXd new_state, const Eigen::Vector2d& rear_axle_center_position, double robot_angle, Eigen::VectorXd& control ,const amp::KinodynamicProblem2D& problem, double scaling_factor);
 
 void MySingleIntegrator::propagate(Eigen::VectorXd& state, Eigen::VectorXd& control, double dt) {
     state += dt * control;
@@ -17,7 +17,7 @@ void MyFirstOrderUnicycle::propagate(Eigen::VectorXd& state, Eigen::VectorXd& co
     // Control is [angular velocity, rotational velcoity]
     const double r = 0.25;
 
-    double num_steps = 100;
+    double num_steps = 200;
     double new_dt = dt / num_steps;
 
     for (int i = 0; i < num_steps; i++) {
@@ -28,42 +28,12 @@ void MyFirstOrderUnicycle::propagate(Eigen::VectorXd& state, Eigen::VectorXd& co
 
 };
 
-
-//RK4 Integration
-// void MySecondOrderUnicycle::propagate(Eigen::VectorXd& state, Eigen::VectorXd& control, double dt) {
-//     // State is [x, y, theta, v, w]
-//     // Control is [a, alpha]
-//     const double r = 0.25;
-//     int num_steps = 50;
-//     double new_dt = dt / num_steps;
-
-//     // Eigen::VectorXd state_derivative(5);
-//     Eigen::VectorXd K1 = state_derivative(state, control, r);
-//     Eigen::VectorXd K2 = state_derivative(state + 0.5 * dt * K1, control, r);
-//     Eigen::VectorXd K3 = state_derivative(state + 0.5 * dt * K2, control, r);
-//     Eigen::VectorXd K4 = state_derivative(state + dt * K3, control, r);
-
-//     state += (dt / 6.0) * (K1 + 2 * K2 + 2 * K3 + K4);
-//}
-
-// // Helper function to compute the derivative of the state given the current state and control
-// Eigen::VectorXd MySecondOrderUnicycle::state_derivative(const Eigen::VectorXd& state, const Eigen::VectorXd& control, double r) {
-//     Eigen::VectorXd derivative(5);
-//     derivative[0] = state[3] * r * std::cos(state[2]);  // dx/dt
-//     derivative[1] = state[3] * r * std::sin(state[2]);  // dy/dt
-//     derivative[2] = state[4];                           // dtheta/dt
-//     derivative[3] = control[0];                         // dv/dt (acceleration)
-//     derivative[4] = control[1];                         // dw/dt (angular acceleration)
-//     return derivative;
-// }
-
-
 void MySecondOrderUnicycle::propagate(Eigen::VectorXd& state, Eigen::VectorXd& control, double dt) {
     // State is [x, y, theta, v, w]
     // Control is [a, alpha]
     const double r = 0.25;
 
-    double num_steps = 100;
+    double num_steps = 200;
     double new_dt = dt / num_steps;
 
     for (int i = 0; i < num_steps; i++) {
@@ -78,8 +48,8 @@ void MySecondOrderUnicycle::propagate(Eigen::VectorXd& state, Eigen::VectorXd& c
 void MySimpleCar::propagate_car(Eigen::VectorXd& state, Eigen::VectorXd& control, double dt, const amp::KinodynamicProblem2D& problem) {
     // State is [x, y, theta, v, phi]
     // Control is [v-dot, phi-dot]
-    double L = get_length(problem);
-    double num_steps = 100;
+    double L = 5;//get_length(problem);
+    double num_steps = 200;
     double new_dt = dt / num_steps;
 
     for (int i = 0; i < num_steps; i++) {
@@ -104,7 +74,7 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
     double num_states = state_space_bounds.size();
 
     // Get all linear primitives
-    double expansion_factor = 0.075; // set this to expand the obstacle verticies
+    double expansion_factor = 0.0875; // set this to expand the obstacle verticies
     std::vector<std::vector<std::tuple<Eigen::Vector2d, Eigen::Vector2d>>> all_primitives = get_all_primitives(problem, expansion_factor);
 
     // Get the bounds of the control space [u1_min, u1_max]
@@ -193,7 +163,7 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
         // Create a vector to store the potential random controls
         Eigen::VectorXd control = Eigen::VectorXd::Zero(num_control_inputs);
         int num_sampled_controls = 0;
-        int max_sampled_controls = 5;
+        //int max_sampled_controls = 5;
         while (num_sampled_controls < max_sampled_controls){
             // Sample a random control
             for (int i = 0; i < num_control_inputs; i++){
@@ -219,7 +189,7 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
                 }
 
                 // If the next step or control is out of bounds, find a new control
-                if (next_step_or_control_out_of_bounds(new_robot_position, control, problem, scaling_factor)){
+                if (next_step_or_control_out_of_bounds(new_state, new_robot_position, control, problem, scaling_factor)){
                     num_sampled_controls++;
                     continue;
                 }          
@@ -239,7 +209,7 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
                 }
 
                 // If the next step or control is out of bounds, find a new control
-                if (car_next_step_or_control_out_of_bounds(new_robot_position, new_robot_angle, control, problem, scaling_factor)){
+                if (car_next_step_or_control_out_of_bounds(new_state, new_robot_position, new_robot_angle, control, problem, scaling_factor)){
                     num_sampled_controls++;
                     continue;
                 }
@@ -313,6 +283,7 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
 
     if (current_itr == max_itr){
         std::cout << "Max iterations reached!" << std::endl;
+        path.valid = false;
         return path;
     }
 
@@ -330,30 +301,19 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
     std::reverse(path.controls.begin(), path.controls.end());
     std::reverse(path.durations.begin(), path.durations.end());
 
-    std::cout << "Number of controls: " << path.controls.size() << std::endl;
-    std::cout << "Number of durations: " << path.durations.size() << std::endl;
-
-    std::cout << std::fixed << std::setprecision(2);
     // Pretend like we start at initial point and propagate the controls
     Eigen::VectorXd current_state = problem.q_init;
+    Eigen::VectorXd previous_state = current_state;
+
+    // Propagate the agent along the path
     path.waypoints.push_back(current_state);
     for (int i = 0; i < path.controls.size(); i++){
+        previous_state = current_state;
         propagate_agent(problem, current_state, path.controls[i], path.durations[i]);
         path.waypoints.push_back(current_state);
-
-        if (path.controls[i].size() > problem.u_bounds.size()){
-            std::cout << "ERROR dimension" << std::endl;
-        }
-        double scaling_factor = 0.99;
-        if (path.controls[i][0] > scaling_factor*problem.u_bounds[0].second || path.controls[i][0] < scaling_factor*problem.u_bounds[0].first){
-            std::cout << "ERROR control" << std::endl;
-        }
-        // std::cout << "Control " << i << ": " << path.controls[i][0] << ", " << path.controls[i][1] << " | Duration: " << path.durations[i] << std::endl;
+        path_length += (current_state.segment<2>(0) - previous_state.segment<2>(0)).norm();
     }
-    std::cout << "Predicted end point of path: " << current_state[0] << ", " << current_state[1] << std::endl;
-
-    std::cout << "Number of waypoints: " << path.waypoints.size() << std::endl;
-
+    //std::cout << "Predicted end point of path: " << current_state[0] << ", " << current_state[1] << " with path length: " << path_length << std::endl;
     path.valid = true;
     return path;
 }
@@ -452,8 +412,14 @@ bool line_segment_with_rotation_in_polygon(const std::vector<std::vector<std::tu
 
 
 // Check if the next step or control is out of bounds
-bool next_step_or_control_out_of_bounds(const Eigen::Vector2d& next_step, Eigen::VectorXd& control ,const amp::KinodynamicProblem2D& problem, double scaling_factor) {
+bool next_step_or_control_out_of_bounds(const Eigen::VectorXd new_state, const Eigen::Vector2d& next_step, Eigen::VectorXd& control ,const amp::KinodynamicProblem2D& problem, double scaling_factor) {
     // Check if the next step is out of bounds
+    for (int i = 0; i < new_state.size(); i++) {
+        if (new_state[i] < scaling_factor*problem.q_bounds[i].first || new_state[i] > scaling_factor*problem.q_bounds[i].second) {
+            return true;
+        }
+    }
+
     for (int i = 0; i < next_step.size(); i++) {
         if (next_step[i] < scaling_factor*problem.q_bounds[i].first || next_step[i] > scaling_factor*problem.q_bounds[i].second) {
             return true;
@@ -471,8 +437,15 @@ bool next_step_or_control_out_of_bounds(const Eigen::Vector2d& next_step, Eigen:
 
 
 // Check if next step or control is out of bounds
-bool car_next_step_or_control_out_of_bounds(const Eigen::Vector2d& rear_axle_center_position, double robot_angle, Eigen::VectorXd& control, const amp::KinodynamicProblem2D& problem, double scaling_factor) {
+bool car_next_step_or_control_out_of_bounds(const Eigen::VectorXd new_state, const Eigen::Vector2d& rear_axle_center_position, double robot_angle, Eigen::VectorXd& control, const amp::KinodynamicProblem2D& problem, double scaling_factor) {
     // Check if the next step is out of bounds
+    for (int i = 0 ; i < new_state.size(); i++){
+        if (new_state[i] < scaling_factor*problem.q_bounds[i].first || new_state[i] > scaling_factor*problem.q_bounds[i].second){
+            return true;
+        }
+    }
+
+
     for (int i = 0; i < rear_axle_center_position.size(); i++) {
         if (rear_axle_center_position[i] < scaling_factor*problem.q_bounds[i].first || rear_axle_center_position[i] > scaling_factor*problem.q_bounds[i].second) {
             return true;
